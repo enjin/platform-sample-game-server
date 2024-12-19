@@ -1,0 +1,10 @@
+query GetManagedWallet(
+    $externalId: String
+ ) {
+  GetManagedWallet: GetWallet(externalId: $externalId) {
+    account {
+        publicKey
+        address
+    }
+  }
+}

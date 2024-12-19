@@ -1,0 +1,98 @@
+query GetTokens(
+  $collectionId: BigInt
+  $tokenIds: [EncodableTokenIdInput]
+  $after: String
+  $first: Int
+  $accountsCursor: String
+  $accountsLimit: Int
+) {
+  GetTokens(
+    collectionId: $collectionId
+    tokenIds: $tokenIds
+    after: $after
+    first: $first
+  ) {
+    edges {
+      cursor
+      node {
+        tokenId
+        supply
+        cap
+        capSupply
+        isFrozen
+        requiresDeposit
+        creationDeposit {
+          depositor {
+            account {
+              address
+              publicKey
+            }
+          }
+          amount
+        }
+        ownerDeposit
+        totalTokenAccountDeposit
+        infusion
+        anyoneCanInfuse
+        tokenMetadata {
+          name
+          symbol
+          decimalCount
+        }
+        attributeCount
+        collection {
+          collectionId
+        }
+        attributes {
+          key
+          value
+        }
+        accounts(after: $accountsCursor, first: $accountsLimit) {
+          totalCount
+          pageInfo {
+            hasNextPage
+            hasPreviousPage
+            startCursor
+            endCursor
+          }
+          edges {
+            cursor
+            node {
+              balance
+              reservedBalance
+              isFrozen
+              wallet {
+                account {
+                  publicKey
+                  address
+                }
+              }
+              approvals {
+                amount
+                expiration
+                wallet {
+                  account {
+                    publicKey
+                    address
+                  }
+                }
+              }
+              namedReserves {
+                pallet
+                amount
+              }
+            }
+          }
+        }
+        nonFungible
+      }
+    }
+    totalCount
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      startCursor
+      endCursor
+    }
+  }
+}
