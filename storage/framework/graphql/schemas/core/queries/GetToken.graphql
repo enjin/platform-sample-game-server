@@ -1,0 +1,18 @@
+query GetToken(
+  $collectionId: BigInt!
+  $tokenId: EncodableTokenIdInput!
+) {
+  GetToken(collectionId:$collectionId tokenId:$tokenId) {
+    collection {
+      collectionId
+    }
+    tokenId
+    tokenMetadata {
+      name
+    }
+    attributes {
+      key
+      value
+    }
+  }
+}

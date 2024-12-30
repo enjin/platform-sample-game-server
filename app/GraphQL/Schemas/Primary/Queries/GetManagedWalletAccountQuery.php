@@ -21,7 +21,7 @@ class GetManagedWalletAccountQuery extends Query implements GraphQlQuery
 
     public function type(): Type
     {
-        return GraphQL::type('String');
+        return GraphQL::type('Wallet');
     }
 
     public function args(): array
@@ -31,6 +31,6 @@ class GetManagedWalletAccountQuery extends Query implements GraphQlQuery
 
     public function resolve($root, $args, $authUser, ResolveInfo $resolveInfo, WalletAccountService $walletAccountService)
     {
-        return $walletAccountService->getManagedWalletAccount($authUser->uuid)['account']['address'];
+        return $walletAccountService->getManagedWalletAccount($authUser->uuid);
     }
 }

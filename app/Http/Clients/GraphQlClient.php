@@ -11,9 +11,8 @@ class GraphQlClient
         protected ?string $url,
         protected ?string $authToken,
         protected array $operations = []
-    )
-    {
-        $this->url = ($url ?? config('platform.url')) . '/graphql/';
+    ) {
+        $this->url = ($url ?? config('platform.url')).'/graphql/';
         $this->authToken = $authToken ?? config('platform.auth_token');
         $this->loadOperations();
     }
@@ -23,9 +22,8 @@ class GraphQlClient
      * The operation name is the name of a file in the graphql storage
      * directory which contains the actual operation.
      *
-     * @param string $operationName
-     * @param ...$variables
      * @return array|null
+     *
      * @throws \Exception
      */
     public function graphQl(string $operationName, ...$variables): mixed
@@ -39,16 +37,14 @@ class GraphQlClient
     /**
      * Takes a schema name, a raw operation string, and variables and returns the response.
      *
-     * @param string $schema
-     * @param string $operation
-     * @param ...$variables
      * @return array|null
+     *
      * @throws \Illuminate\Http\Client\ConnectionException
      */
     public function graphQlRaw(string $schema, string $operation, ...$variables): mixed
     {
-        $response = Http::withHeaders(["Authorization" => "{$this->authToken}"])
-            ->post($this->url . $schema, [
+        $response = Http::withHeaders(['Authorization' => "{$this->authToken}"])
+            ->post($this->url.$schema, [
                 'query' => $operation,
                 'variables' => $variables,
             ]);
@@ -59,8 +55,6 @@ class GraphQlClient
     /**
      * Get the operation from the operations array.
      *
-     * @param string $operationName
-     * @return array|null
      * @throws \Exception
      */
     protected function getOperation(string $operationName): ?array
@@ -69,10 +63,10 @@ class GraphQlClient
             return str_ends_with($operation, ".$operationName");
         }))->first();
 
-        if (!empty($matchingOperation)) {
+        if (! empty($matchingOperation)) {
             $operation = $this->operations[$matchingOperation];
         } else {
-           throw new \Exception("Operation {$operationName} not found.");
+            throw new \Exception("Operation {$operationName} not found.");
         }
 
         [$schema, $operationType, $operationName] = explode('.', $matchingOperation);
@@ -82,8 +76,6 @@ class GraphQlClient
 
     /**
      * Load all query names and paths from the graphql storage directory.
-     *
-     * @return void
      */
     protected function loadOperations(): void
     {

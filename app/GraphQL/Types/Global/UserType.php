@@ -13,7 +13,7 @@ class UserType extends Type implements GraphQlType
         'description' => 'A user account.',
     ];
 
-    public function fields() : array
+    public function fields(): array
     {
         return [
             'id' => [

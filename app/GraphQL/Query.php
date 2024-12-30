@@ -9,7 +9,7 @@ use Rebing\GraphQL\Support\Query as BaseQuery;
 
 abstract class Query extends BaseQuery
 {
-    public function authorize($root, array $args, $ctx, ResolveInfo $resolveInfo = null, Closure $getSelectFields = null) : bool
+    public function authorize($root, array $args, $ctx, ?ResolveInfo $resolveInfo = null, ?Closure $getSelectFields = null): bool
     {
         ray('Auth Check');
 

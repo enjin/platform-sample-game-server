@@ -19,12 +19,12 @@ class CreateManagedWalletAccountMutation extends Mutation implements GraphQlMuta
         'description' => 'Create a managed wallet account for the logged in user.',
     ];
 
-    public function type() : Type
+    public function type(): Type
     {
         return GraphQL::type('Boolean');
     }
 
-    public function args() : array
+    public function args(): array
     {
         return [];
     }

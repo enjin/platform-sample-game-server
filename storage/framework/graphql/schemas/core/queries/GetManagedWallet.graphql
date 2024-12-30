@@ -3,8 +3,21 @@ query GetManagedWallet(
  ) {
   GetManagedWallet: GetWallet(externalId: $externalId) {
     account {
-        publicKey
-        address
+      publicKey
+      address
+    }
+    tokenAccounts(first:50) {
+      edges {
+        node {
+          balance
+          token {
+            tokenId
+            tokenMetadata {
+              name
+            }
+          }
+        }
+      }
     }
   }
 }

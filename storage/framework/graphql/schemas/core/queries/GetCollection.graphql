@@ -1,0 +1,22 @@
+query GetCollection(
+  $collectionId: BigInt!
+) {
+  GetCollection(collectionId:$collectionId) {
+    maxTokenCount
+    maxTokenSupply
+    attributes {
+	  key
+      value
+    }
+    tokens(first:50) {
+      edges {
+        node {
+          tokenId
+          tokenMetadata {
+            name
+          }
+        }
+      }
+    }
+  }
+}

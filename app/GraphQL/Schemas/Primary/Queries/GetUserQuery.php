@@ -18,12 +18,12 @@ class GetUserQuery extends Query implements GraphQlQuery
         'description' => 'Get a user from their API token.',
     ];
 
-    public function type() : Type
+    public function type(): Type
     {
         return GraphQL::type('User');
     }
 
-    public function args() : array
+    public function args(): array
     {
         return [];
     }

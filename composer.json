@@ -5,13 +5,15 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
+        "ext-bcmath": "*",
         "php": "^8.2",
-        "v16studios/graphql-laravel-bootstrapper": "^1.0",
+        "enjin/php-blockchain-tools": "^1.0",
         "laravel/framework": "^11.9",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.9",
         "rebing/graphql-laravel": "^9.6",
-        "spatie/laravel-ray": "^1.37"
+        "spatie/laravel-ray": "^1.37",
+        "v16studios/graphql-laravel-bootstrapper": "^1.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -21,7 +23,8 @@
         "mll-lab/laravel-graphiql": "^3.2",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.1",
-        "phpunit/phpunit": "^11.0.1"
+        "phpunit/phpunit": "^11.0.1",
+        "rector/rector": "2.0.3"
     },
     "autoload": {
         "psr-4": {
@@ -37,6 +40,10 @@
     },
     "repositories": [],
     "scripts": {
+        "fix": [
+            "vendor/bin/rector process",
+            "vendor/bin/pint --config ./pint.json"
+        ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"
