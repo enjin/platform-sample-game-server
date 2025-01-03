@@ -2,12 +2,8 @@
 
 namespace App\GraphQL\Types\Global;
 
-use GraphQL\Bootstrapper\GraphQL\Types\Pagination\ConnectionInput;
 use GraphQL\Bootstrapper\Interfaces\GraphQlType;
 use GraphQL\Bootstrapper\Traits\HasSelectFields;
-use Illuminate\Pagination\Cursor;
-use Illuminate\Pagination\CursorPaginator;
-use Illuminate\Support\Arr;
 use Rebing\GraphQL\Support\Facades\GraphQL;
 use Rebing\GraphQL\Support\Type;
 

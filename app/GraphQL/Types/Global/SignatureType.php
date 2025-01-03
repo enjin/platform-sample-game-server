@@ -6,7 +6,7 @@ use GraphQL\Bootstrapper\Interfaces\GraphQlType;
 use Rebing\GraphQL\Support\Facades\GraphQL;
 use Rebing\GraphQL\Support\Type;
 
-class WalletType extends Type implements GraphQlType
+class SignatureType extends Type implements GraphQlType
 {
     /**
      * Get the type's attributes.
@@ -14,8 +14,8 @@ class WalletType extends Type implements GraphQlType
     public function attributes(): array
     {
         return [
-            'name' => 'Wallet',
-            'description' => 'A wallet.',
+            'name' => 'WalletSignature',
+            'description' => 'A wallet signature.',
         ];
     }
 
@@ -25,17 +25,13 @@ class WalletType extends Type implements GraphQlType
     public function fields(): array
     {
         return [
-            'address' => [
+            'payload' => [
                 'type' => GraphQL::type('String'),
-                'description' => 'The wallet address.',
+                'description' => 'The signature payload.',
             ],
-            'tokens' => [
-                'type' => GraphQL::type('[TokenAccount]'),
-                'description' => 'The wallet tokens.',
-            ],
-            'signature' => [
-                'type' => GraphQL::type('WalletSignature'),
-                'description' => 'The wallet signature.',
+            'timestamp' => [
+                'type' => GraphQL::type('Int'),
+                'description' => 'The signature timestamp.',
             ],
         ];
     }

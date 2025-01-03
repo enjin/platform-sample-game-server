@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Http\Clients\GraphQlClient;
+use Illuminate\Support\Carbon;
 
 class WalletAccountService
 {
@@ -12,11 +13,9 @@ class WalletAccountService
 
     public function getWalletAccounts() {}
 
-    public function getManagedWalletAccount(string $externalId)
+    public function getManagedWalletAccount(string $externalId, ?array $signature = null)
     {
         $wallet = $this->graphQlClient->graphQl('GetManagedWallet', externalId: $externalId);
-
-        ray($wallet);
 
         if (! $wallet) {
             return null;
@@ -34,9 +33,15 @@ class WalletAccountService
             ];
         });
 
+        $timestamp = Carbon::now()->timestamp;
+
         return [
             'address' => $wallet['account']['address'],
             'tokens' => $tokenAccounts,
+            'signature' => $signature ?? [
+                'payload' => hash_hmac('sha256', implode('|', [$externalId, $timestamp]), config('app.key')),
+                'timestamp' => $timestamp,
+            ],
         ];
     }
 

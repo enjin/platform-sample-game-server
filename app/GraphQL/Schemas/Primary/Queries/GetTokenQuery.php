@@ -5,7 +5,6 @@ namespace App\GraphQL\Schemas\Primary\Queries;
 use App\GraphQL\Query;
 use App\GraphQL\Traits\InPrimarySchema;
 use App\Rules\MinBigInt;
-use App\Services\CollectionService;
 use App\Services\TokenService;
 use GraphQL\Bootstrapper\Interfaces\GraphQlQuery;
 use GraphQL\Type\Definition\ResolveInfo;

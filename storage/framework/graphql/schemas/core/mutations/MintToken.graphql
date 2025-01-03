@@ -1,0 +1,13 @@
+mutation MintToken(
+  $collectionId: BigInt!
+  $params: MintTokenParams!
+  $recipient: String!
+) {
+  MintToken(
+    collectionId: $collectionId
+    params: $params
+    recipient: $recipient
+  ) {
+    id
+  }
+}

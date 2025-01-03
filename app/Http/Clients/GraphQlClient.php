@@ -84,7 +84,7 @@ class GraphQlClient
         collect($files)
             ->filter(fn ($file) => str_ends_with($file, '.gql') || str_ends_with($file, '.graphql'))
             ->each(
-                function ($file) {
+                function ($file): void {
                     $filename = pathinfo($file, PATHINFO_FILENAME);
                     [$root, $schema, $operation] = explode('/', pathinfo($file)['dirname']);
                     $this->operations["{$schema}.{$operation}.{$filename}"] = $file;

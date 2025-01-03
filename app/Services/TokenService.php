@@ -23,5 +23,18 @@ class TokenService
 
     public function getTokens() {}
 
+    public function mintToken($recipient, $collectionId, $tokenId, $amount): bool
+    {
+        $tokenId = ['integer' => $tokenId];
+        $params = [
+            'tokenId' => $tokenId,
+            'amount' => $amount,
+        ];
+
+        $this->graphQlClient->graphQl('MintToken', collectionId: $collectionId, params: $params, recipient: $recipient);
+
+        return true;
+    }
+
     public function transferToken() {}
 }
