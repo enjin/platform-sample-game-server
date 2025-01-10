@@ -37,6 +37,7 @@ class WalletAccountService
 
         return [
             'address' => $wallet['account']['address'],
+            'publicKey' => $wallet['account']['publicKey'],
             'tokens' => $tokenAccounts,
             'signature' => $signature ?? [
                 'payload' => hash_hmac('sha256', implode('|', [$externalId, $timestamp]), config('app.key')),

@@ -29,6 +29,10 @@ class WalletType extends Type implements GraphQlType
                 'type' => GraphQL::type('String'),
                 'description' => 'The wallet address.',
             ],
+            'publicKey' => [
+                'type' => GraphQL::type('String'),
+                'description' => 'The wallet public key.',
+            ],
             'tokens' => [
                 'type' => GraphQL::type('[TokenAccount]'),
                 'description' => 'The wallet tokens.',
