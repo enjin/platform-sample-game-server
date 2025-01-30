@@ -36,5 +36,30 @@ class TokenService
         return true;
     }
 
-    public function transferToken() {}
+    public function burnToken($collectionId, $tokenId, $amount, $signingAccount): bool
+    {
+        $tokenId = ['integer' => $tokenId];
+        $params = [
+            'tokenId' => $tokenId,
+            'amount' => $amount,
+        ];
+
+        $this->graphQlClient->graphQl('BurnToken', collectionId: $collectionId, params: $params, signingAccount: $signingAccount);
+
+        return true;
+    }
+
+    public function transferToken($recipient, $collectionId, $tokenId, $amount, $signingAccount): bool
+    {
+        $tokenId = ['integer' => $tokenId];
+        $params = [
+            'tokenId' => $tokenId,
+            'amount' => $amount,
+        ];
+
+        $result = $this->graphQlClient->graphQl('SimpleTransferToken', collectionId: $collectionId, recipient: $recipient, params: $params, signingAccount: $signingAccount);
+        ray($result)->label('TransferToken');
+
+        return true;
+    }
 }

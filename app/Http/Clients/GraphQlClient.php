@@ -59,9 +59,7 @@ class GraphQlClient
      */
     protected function getOperation(string $operationName): ?array
     {
-        $matchingOperation = collect(array_filter(array_keys($this->operations), function ($operation) use ($operationName) {
-            return str_ends_with($operation, ".$operationName");
-        }))->first();
+        $matchingOperation = collect(array_filter(array_keys($this->operations), fn ($operation) => str_ends_with($operation, ".$operationName")))->first();
 
         if (! empty($matchingOperation)) {
             $operation = $this->operations[$matchingOperation];

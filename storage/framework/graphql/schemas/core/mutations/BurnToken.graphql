@@ -1,0 +1,13 @@
+mutation BurnToken(
+  $collectionId: BigInt!
+  $params: BurnParamsInput!
+  $signingAccount: String
+) {
+  Burn(
+    collectionId: $collectionId
+    params: $params
+    signingAccount: $signingAccount
+  ) {
+    id
+  }
+}

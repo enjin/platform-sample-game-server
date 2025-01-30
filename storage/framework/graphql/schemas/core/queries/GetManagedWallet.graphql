@@ -11,9 +11,16 @@ query GetManagedWallet(
         node {
           balance
           token {
+            collection {
+              collectionId
+            }
             tokenId
             tokenMetadata {
               name
+            }
+            attributes {
+              key
+              value
             }
           }
         }

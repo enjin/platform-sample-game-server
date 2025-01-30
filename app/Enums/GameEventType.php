@@ -9,4 +9,8 @@ enum GameEventType: string
     use EnumExtensions;
 
     case ITEM_COLLECTED = 'itemCollected';
+
+    case ITEM_MELTED = 'itemMelted';
+
+    case ITEM_TRANSFERRED = 'itemTransferred';
 }

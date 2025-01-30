@@ -27,6 +27,7 @@ class WalletAccountService
             return [
                 'balance' => $tokenAccount['balance'],
                 'token' => [
+                    'collectionId' => $tokenAccount['token']['collection']['collectionId'],
                     'tokenId' => $tokenAccount['token']['tokenId'],
                     'name' => $tokenAccount['token']['tokenMetadata']['name'],
                 ],

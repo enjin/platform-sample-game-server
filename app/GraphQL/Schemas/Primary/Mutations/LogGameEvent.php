@@ -62,9 +62,17 @@ class LogGameEvent extends Mutation implements GraphQlMutation
 
         $data = json_decode(base64_decode($args['data']), true);
 
+        ray($args, $data)->label('Args and Data');
+
         match ($args['eventType']) {
             GameEventType::ITEM_COLLECTED->name => $tokenService->mintToken($walletAccount['address'], ...$data),
-            default => false,
+            GameEventType::ITEM_MELTED->name => $tokenService->burnToken(...$data),
+            GameEventType::ITEM_TRANSFERRED->name => $tokenService->transferToken(...$data),
+            default => function () use ($data) {
+                ray('Unknown event type', ...$data)->label('Event data');
+
+                return false;
+            },
         };
 
         return true;
