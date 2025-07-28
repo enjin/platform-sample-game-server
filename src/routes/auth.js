@@ -1,18 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const AuthService = require('../services/authService');
-const appKeyAuth = require('../middlewares/appKeyAuth');
 const { getManagedWallet, createManagedWallet } = require('../services/enjinService');
 
 // Health check endpoint
-router.get('/health-check', appKeyAuth, async (req, res) => {
+router.get('/health-check', async (req, res) => {
     res.status(200).json({
         status: "OK"
     });
 });
 
 // Register endpoint
-router.post('/register', appKeyAuth, async (req, res) => {
+router.post('/register', async (req, res) => {
     try {
         const { email, password } = req.body;
         const token = await AuthService.register(email, password);
@@ -34,7 +33,7 @@ router.post('/register', appKeyAuth, async (req, res) => {
 });
 
 // Login endpoint
-router.post('/login', appKeyAuth, async (req, res) => {
+router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
         const token = await AuthService.login(email, password);

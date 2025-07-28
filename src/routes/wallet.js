@@ -1,15 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
-const appKeyAuth = require('../middlewares/appKeyAuth');
 const jwtAuth = require('../middlewares/jwtAuth');
 const { getManagedWallet, createManagedWallet, getManagedWalletTokens } = require('../services/enjinService');
 
-// Middleware chain for token operations
-const tokenMiddleware = [appKeyAuth, jwtAuth];
-
 // Get managed wallet endpoint
-router.post('/get', tokenMiddleware, async (req, res) => {
+router.post('/get', jwtAuth, async (req, res) => {
     try {
         const userEmail = req.user.email;
         const getManagedWalletResponse = await getManagedWallet(userEmail)
@@ -29,7 +25,7 @@ router.post('/get', tokenMiddleware, async (req, res) => {
 });
 
 // Create and return managed wallet endpoint
-router.post('/create', tokenMiddleware, async (req, res) => {
+router.post('/create', jwtAuth, async (req, res) => {
     try {
         const userEmail = req.user.email;
         const createManagedWalletResponse = await createManagedWallet(userEmail)
@@ -49,7 +45,7 @@ router.post('/create', tokenMiddleware, async (req, res) => {
 });
 
 // Get managed wallet endpoint
-router.get('/get-tokens', tokenMiddleware, async (req, res) => {
+router.get('/get-tokens', jwtAuth, async (req, res) => {
     try {
         const userEmail = req.user.email;
         const getManagedWalletTokensResponse = await getManagedWalletTokens(userEmail)
