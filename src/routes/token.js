@@ -1,15 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
-const appKeyAuth = require('../middlewares/appKeyAuth');
 const jwtAuth = require('../middlewares/jwtAuth');
 const { mintTokenAndWaitForTransaction, meltTokenAndWaitForTransaction, transferTokenAndWaitForTransaction, getManagedWallet } = require('../services/enjinService');
 
-// Middleware chain for token operations
-const tokenMiddleware = [appKeyAuth, jwtAuth];
-
 // Mint token endpoint
-router.post('/mint', tokenMiddleware, async (req, res) => {
+router.post('/mint', jwtAuth, async (req, res) => {
     try {
         const userEmail = req.user.email;
         const getManagedWalletResponse = await getManagedWallet(userEmail)
@@ -30,7 +26,7 @@ router.post('/mint', tokenMiddleware, async (req, res) => {
 });
 
 // Melt token endpoint
-router.post('/melt', tokenMiddleware, async (req, res) => {
+router.post('/melt', jwtAuth, async (req, res) => {
     try {
         const userEmail = req.user.email;
         const getManagedWalletResponse = await getManagedWallet(userEmail)
@@ -51,7 +47,7 @@ router.post('/melt', tokenMiddleware, async (req, res) => {
 });
 
 // Transfer token endpoint
-router.post('/transfer', tokenMiddleware, async (req, res) => {
+router.post('/transfer', jwtAuth, async (req, res) => {
     try {
         const userEmail = req.user.email;
         const getManagedWalletResponse = await getManagedWallet(userEmail)
