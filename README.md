@@ -17,7 +17,8 @@ This server provides the backend functionality for managing NFTs within the samp
 
 *   Node.js and npm installed
 *   An Enjin Platform account and API key
-*   (Optional) Wallet Daemon
+*   Wallet Daemon
+*   Aquire cENJ from the [Canary Faucet](https://faucet.canary.enjin.io/) to fund the Wallet Daemon account
 
 ## Setup Instructions
 
@@ -39,7 +40,7 @@ This server provides the backend functionality for managing NFTs within the samp
     Duplicate the `.env.example` file and rename the copy to `.env`.
     Open the `.env` file and fill in the following variables:
     - `PORT=3000` (You can change this if port 3000 is already in use).
-    - `JWT_SECRET`: Generate another secure, random string. This is used for authenticating players.
+    - `JWT_SECRET`: Generate a secure, random string. This is used for authenticating players.
     - `ENJIN_API_URL`: Keep the default `https://platform.canary.enjin.io/graphql` for testing on the Canary network.
     - `ENJIN_API_KEY`: Paste the **API Key Token** from your Enjin Platform account.
     - `DAEMON_WALLET_ADDRESS`: Paste the wallet address you copied from the Wallet Daemon UI.
@@ -66,8 +67,9 @@ This server provides the backend functionality for managing NFTs within the samp
 - `/api/token/melt`: Melt token
 - `/api/token/transfer`: Transfer token
 
-## Enjin Platform Documentation
+## Full Documentation
 
 For more in-depth information about the Enjin Platform and its features, please refer to the official documentation:
 
-[Placeholder: Link to Enjin Documentation]
+* [Setup Guide](https://docs.enjin.io/guides/platform/enjin-farmer-sample-game/setup-guide)
+* [Implementation Breakdown](https://docs.enjin.io/guides/platform/enjin-farmer-sample-game/implementation-breakdown)
