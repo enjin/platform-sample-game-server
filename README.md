@@ -67,7 +67,7 @@ This server provides the backend functionality for managing NFTs within the samp
 - `/api/token/melt`: Melt token
 - `/api/token/transfer`: Transfer token
 
-## Enjin Platform Documentation
+## Full Documentation
 
 For more in-depth information about the Enjin Platform and its features, please refer to the official documentation:
 
