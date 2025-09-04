@@ -1,5 +1,6 @@
 const axios = require('axios');
 const fs = require('fs');
+const Pusher = require('pusher-js/node');
 
 // Resource token definitions
 const RESOURCE_TOKENS = [
@@ -10,34 +11,6 @@ const RESOURCE_TOKENS = [
 
 async function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function getTransactionStatus(requestId) {
-    const response = await axios.post(process.env.ENJIN_API_URL, {
-        query: `query GetTransaction {
-            GetTransaction(id: ${requestId}) {
-                state
-                result
-                events {
-                    edges {
-                        node {
-                            params {
-                                type
-                                value
-                            }
-                        }
-                    }
-                }
-            }
-        }`
-    }, {
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': process.env.ENJIN_API_KEY
-        }
-    });
-
-    return response.data.data.GetTransaction;
 }
 
 async function extractCollectionId(transaction) {
@@ -180,6 +153,142 @@ async function getToken(collectionId, tokenId) {
     });
 
     return response;
+}
+
+async function getWalletPublicKey(address){
+    const response = await axios.post(process.env.ENJIN_API_URL, {
+        query: `query getWalletPublicKey($address: String){
+  GetWallet(account: $address){
+    account{
+      publicKey
+      address
+    }
+  }
+}`,
+        variables: {
+            address: address
+        }
+    }, {
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': process.env.ENJIN_API_KEY
+        }
+    });
+
+    return response.data.data.GetWallet;
+}
+
+// ------------------------
+// WebSocket (Pusher) setup
+// ------------------------
+
+let enjinPusher = null;
+let enjinChannel = null;
+let daemonPublicKeyCache = null;
+let wsInitPromise = null;
+
+// Track waiters by transaction id
+const transactionWaiters = new Map(); // id -> { resolve, reject, operationType }
+
+function parsePusherConfigFromUrl(urlStr) {
+    try {
+        const u = new URL(urlStr);
+        const path = u.pathname || '';
+        const appKey = path.includes('/app/') ? path.split('/app/')[1].split('?')[0] : '';
+        // host pattern like ws-us2.pusher.com
+        const host = u.hostname || '';
+        const sub = host.split('.')[0] || '';
+        const cluster = sub.startsWith('ws-') ? sub.substring(3) : sub; // remove 'ws-'
+        return { appKey, cluster };
+    } catch (e) {
+        return { appKey: '', cluster: '' };
+    }
+}
+
+async function ensureWebsocketInitialized() {
+    if (wsInitPromise) return wsInitPromise;
+
+    wsInitPromise = (async () => {
+        if (!process.env.ENJIN_PLATFORM_WEBSOCKET_URL) {
+            throw new Error('ENJIN_PLATFORM_WEBSOCKET_URL is not set');
+        }
+        if (!process.env.DAEMON_WALLET_ADDRESS) {
+            throw new Error('DAEMON_WALLET_ADDRESS is not set');
+        }
+
+        // Get daemon wallet public key once and cache it
+        if (!daemonPublicKeyCache) {
+            const wallet = await getWalletPublicKey(process.env.DAEMON_WALLET_ADDRESS);
+            if (!wallet || !wallet.account || !wallet.account.publicKey) {
+                throw new Error('Failed to resolve daemon wallet public key');
+            }
+            daemonPublicKeyCache = wallet.account.publicKey;
+        }
+
+        const { appKey, cluster } = parsePusherConfigFromUrl(process.env.ENJIN_PLATFORM_WEBSOCKET_URL);
+        if (!appKey) {
+            throw new Error('Invalid ENJIN_PLATFORM_WEBSOCKET_URL: cannot extract app key');
+        }
+
+        // Initialize Pusher client
+        enjinPusher = new Pusher(appKey, {
+            cluster: cluster || undefined,
+            forceTLS: true,
+        });
+
+        // Subscribe to daemon wallet public key channel
+        enjinChannel = enjinPusher.subscribe(daemonPublicKeyCache);
+
+        // Handle events relevant to transactions
+        const handleEvent = async (eventName, payload) => {
+            try {
+                const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
+                if (!data || typeof data.id !== 'number') return;
+                const waiter = transactionWaiters.get(data.id);
+                if (!waiter) return; // Not waiting on this tx
+
+                // If there's no definitive state yet, ignore
+                if (
+                    data.state === 'PENDING' ||
+                    data.state === 'PROCESSING' ||
+                    data.state === 'BROADCAST' ||
+                    data.state === 'EXECUTED'
+                ) return;
+
+                if (data.state === 'FINALIZED' && data.result === 'EXTRINSIC_SUCCESS') {
+                    transactionWaiters.delete(data.id);
+                    waiter.resolve(data);
+                } else if (
+                    data.state === 'FAILED' ||
+                    data.state === 'ABANDONED' ||
+                    data.result === 'EXTRINSIC_FAILED'
+                ) {
+                    transactionWaiters.delete(data.id);
+                    waiter.reject(new Error(`${waiter.operationType} failed`));
+                }
+                // Otherwise, ignore and wait for another event
+            } catch (err) {
+                // If parsing/fetching fails, do not break others; log and continue
+                console.error('WebSocket event handling error:', err);
+            }
+        };
+
+        // Bind transaction events
+        const binders = [
+            'platform:transaction-created',
+            'platform:transaction-updated',
+        ];
+        binders.forEach(ev => enjinChannel.bind(ev, payload => handleEvent(ev, payload)));
+
+        // //Optional: you may use global binding (covers any event variants, not only platform:transaction-created and platform:transaction-updated)
+        // if (typeof enjinPusher.bind_global === 'function') {
+        //     enjinPusher.bind_global((eventName, payload) => handleEvent(eventName, payload));
+        // }
+
+        return true;
+    })();
+
+    return wsInitPromise;
 }
 
 async function getManagedWallet(externalId){
@@ -356,8 +465,6 @@ async function mintTokenAndWaitForTransaction(tokenId, amount, recipient) {
     console.log('Minting Token, please wait...');
     try {
         const mintTokenResponse = await mintToken(tokenId, amount, recipient);
-        await sleep(10000);
-        
         const requestId = mintTokenResponse.data.data.MintToken.id;
         await waitForTransaction(requestId, "'Token #" + tokenId + "' minting");
         console.log(`'Token #${tokenId}' minted successfully.`);
@@ -410,8 +517,6 @@ async function meltTokenAndWaitForTransaction(tokenId, amount, signingAccount) {
     console.log('Melting Token, please wait...');
     try {
         const meltTokenResponse = await meltToken(tokenId, amount, signingAccount);
-        await sleep(10000);
-        
         const requestId = meltTokenResponse.data.data.Burn.id;
         await waitForTransaction(requestId, "'Token #" + tokenId + "' melting");
         console.log(`'Token #${tokenId}' melted successfully.`);
@@ -467,8 +572,6 @@ async function transferTokenAndWaitForTransaction(tokenId, amount, signingAccoun
     console.log('Transferring Token, please wait...');
     try {
         const transferTokenResponse = await transferToken(tokenId, amount, signingAccount, recipient);
-        await sleep(10000);
-        
         const requestId = transferTokenResponse.data.data.SimpleTransferToken.id;
         await waitForTransaction(requestId, "'Token #" + tokenId + "' transfer");
         console.log(`'Token #${tokenId}' transferred successfully.`);
@@ -480,26 +583,23 @@ async function transferTokenAndWaitForTransaction(tokenId, amount, signingAccoun
 }
 
 async function waitForTransaction(requestId, operationType = 'operation') {
-    while (true) {
-        const transaction = await getTransactionStatus(requestId);
+    await ensureWebsocketInitialized();
 
-        if (transaction.state === 'PENDING') {
-            console.log(`Please confirm the ${operationType} request in the Enjin Platform. Request ID: ${requestId}`);
-            await sleep(10000);
-            continue;
-        }
-
-        if (transaction.state === 'FINALIZED' && transaction.result === 'EXTRINSIC_SUCCESS') {
-            return transaction;
-        }
-
-        if (transaction.state === 'FAILED' || transaction.state === 'ABANDONED' || transaction.result === 'EXTRINSIC_FAILED') {
-            throw new Error(`${operationType} failed`);
-        }
-
-        console.log(`Waiting for the ${operationType} to finalize...`);
-        await sleep(10000);
+    // If a waiter already exists, chain to it
+    if (transactionWaiters.has(requestId)) {
+        const existing = transactionWaiters.get(requestId);
+        return new Promise((resolve, reject) => {
+            const prevResolve = existing.resolve;
+            const prevReject = existing.reject;
+            existing.resolve = (tx) => { try { prevResolve(tx); } catch {} resolve(tx); };
+            existing.reject = (err) => { try { prevReject(err); } catch {} reject(err); };
+        });
     }
+
+    return new Promise((resolve, reject) => {
+        transactionWaiters.set(requestId, { resolve, reject, operationType });
+        console.log(`Waiting for the ${operationType} to finalize via WebSocket. Request ID: ${requestId}`);
+    });
 }
 
 async function checkAndCreateCollection() {
@@ -507,8 +607,6 @@ async function checkAndCreateCollection() {
         console.log('No collection ID found. Creating new collection, please wait...');
         try {
             const createCollectionResponse = await createCollection();
-            await sleep(10000);
-            
             const requestId = createCollectionResponse.data.data.CreateCollection.id;
             const transaction = await waitForTransaction(requestId, "'Enjin Sample Game' collection creation");
             
@@ -542,8 +640,6 @@ async function checkTokenExists(collectionId, tokenId) {
 async function createResourceToken(collectionId, tokenId, name, media) {
     console.log(`Creating resource token '${name}', please wait...`);
     const createTokenResponse = await createToken(collectionId, tokenId, name, media);
-    await sleep(10000);
-    
     const requestId = createTokenResponse.data.data.CreateToken.id;
     await waitForTransaction(requestId, `'${name}' token creation`);
     console.log(`Resource token '${name}' created successfully.`);
@@ -577,5 +673,12 @@ async function prepareCollection() {
 }
 
 module.exports = {
-    prepareCollection, createManagedWallet, getManagedWallet, getManagedWalletTokens, mintTokenAndWaitForTransaction, meltTokenAndWaitForTransaction, transferTokenAndWaitForTransaction
+    prepareCollection,
+    getWalletPublicKey,
+    createManagedWallet,
+    getManagedWallet,
+    getManagedWalletTokens,
+    mintTokenAndWaitForTransaction,
+    meltTokenAndWaitForTransaction,
+    transferTokenAndWaitForTransaction
 };
