@@ -61,10 +61,27 @@ public sealed class EnjinService : IAsyncDisposable
         var collectionId = _state.CollectionId;
         if (collectionId is null)
         {
-            _log.LogInformation("No collection ID on file. Creating new '{Name}' collection...", _opts.CollectionName);
-            collectionId = await CreateCollectionAsync(ct);
+            // Avoid creating duplicate collections on canary if state.json was lost.
+            // First look for an existing collection owned by the daemon wallet whose
+            // "name" attribute matches our configured collection name.
+            _log.LogInformation(
+                "No collection ID on file. Checking for an existing '{Name}' collection owned by {Owner}...",
+                _opts.CollectionName, _opts.DaemonWalletAddress);
+
+            var existing = await FindExistingCollectionAsync(ct);
+            if (existing is not null)
+            {
+                _log.LogInformation("Found existing collection {Id}; reusing.", existing);
+                collectionId = existing;
+            }
+            else
+            {
+                _log.LogInformation("No matching collection found. Creating new '{Name}' collection...", _opts.CollectionName);
+                collectionId = await CreateCollectionAsync(ct);
+                _log.LogInformation("Created collection with ID {Id}", collectionId);
+            }
+
             _state.SetCollectionId(collectionId.Value);
-            _log.LogInformation("Created collection with ID {Id}", collectionId);
         }
         else
         {
@@ -85,6 +102,33 @@ public sealed class EnjinService : IAsyncDisposable
             await CreateResourceTokenAsync(collectionId.Value, token, ct);
             _log.LogInformation("Resource token #{Id} '{Name}' ready", token.Id, token.Name);
         }
+    }
+
+    // Returns the BigInteger id of an existing collection owned by the daemon
+    // wallet whose "name" attribute matches the configured collection name, or
+    // null if no such collection exists. Used both before creating a new
+    // collection (to avoid duplicates) and after creation (to retrieve the
+    // new id, since v3 Transaction does not surface emitted events).
+    private async Task<BigInteger?> FindExistingCollectionAsync(CancellationToken ct)
+    {
+        var query = new QueryQueryBuilder().WithGetCollections(
+            new CollectionQueryBuilder()
+                .WithId()
+                .WithAttributes(new AttributeQueryBuilder().WithKey().WithValue()),
+            _network, _chain,
+            ids: null,
+            address: _opts.DaemonWalletAddress);
+
+        var resp = await _client.SendQuery(query);
+        EnsureSuccess(resp, "GetCollections");
+
+        var match = (resp.Result.Data?.GetCollections ?? Array.Empty<Collection>())
+            .Where(c => c is not null)
+            .Where(c => c!.Attributes?.Any(a => a is not null && a.Key == "name" && a.Value == _opts.CollectionName) == true)
+            .OrderByDescending(c => c!.Id)
+            .FirstOrDefault();
+
+        return match?.Id;
     }
 
     private async Task<BigInteger> CreateCollectionAsync(CancellationToken ct)
@@ -108,30 +152,15 @@ public sealed class EnjinService : IAsyncDisposable
 
         // v3 Transaction does not surface emitted events; locate the new collection by
         // listing those owned by the daemon wallet and matching on the "name" attribute.
-        var query = new QueryQueryBuilder().WithGetCollections(
-            new CollectionQueryBuilder()
-                .WithId()
-                .WithAttributes(new AttributeQueryBuilder().WithKey().WithValue()),
-            _network, _chain,
-            ids: null,
-            address: _opts.DaemonWalletAddress);
-
-        var resp = await _client.SendQuery(query);
-        EnsureSuccess(resp, "GetCollections");
-        var match = (resp.Result.Data?.GetCollections ?? Array.Empty<Collection>())
-            .Where(c => c is not null)
-            .Where(c => c!.Attributes?.Any(a => a is not null && a.Key == "name" && a.Value == _opts.CollectionName) == true)
-            .OrderByDescending(c => c!.Id)
-            .FirstOrDefault();
-
-        if (match is null)
+        var found = await FindExistingCollectionAsync(ct);
+        if (found is null)
         {
             throw new InvalidOperationException(
                 $"CreateCollection finalized but no collection named '{_opts.CollectionName}' " +
                 $"found owned by {_opts.DaemonWalletAddress}.");
         }
 
-        return match!.Id;
+        return found.Value;
     }
 
     // Checks whether a token entry exists in our collection by querying it directly.
@@ -383,6 +412,10 @@ public sealed class EnjinService : IAsyncDisposable
             await Task.Delay(TimeSpan.FromSeconds(_opts.TransactionInitialDelaySeconds), ct);
         }
 
+        var started = DateTime.UtcNow;
+        TransactionStateEnum? lastLoggedState = null;
+        DateTime lastStuckWarning = DateTime.UtcNow;
+
         while (true)
         {
             ct.ThrowIfCancellationRequested();
@@ -399,16 +432,37 @@ public sealed class EnjinService : IAsyncDisposable
             switch (txn.State)
             {
                 case TransactionStateEnum.Finalized:
-                    _log.LogInformation("Transaction {Uuid} ({Desc}) finalized.", uuid, description);
+                    _log.LogInformation("Transaction {Uuid} ({Desc}) finalized after {Elapsed:F0}s.",
+                        uuid, description, (DateTime.UtcNow - started).TotalSeconds);
                     return txn;
+
                 case TransactionStateEnum.Failed:
                 case TransactionStateEnum.Abandoned:
                 case TransactionStateEnum.Timeout:
                     throw new InvalidOperationException(
                         $"Transaction {uuid} ({description}) ended in terminal state {txn.State}.");
+
                 default:
-                    _log.LogInformation(
-                        "Waiting for {Desc} (uuid={Uuid}, state={State})...", description, uuid, txn.State);
+                    // Log only on state transitions to avoid flooding logs while polling.
+                    if (lastLoggedState != txn.State)
+                    {
+                        _log.LogInformation(
+                            "Waiting for {Desc} (uuid={Uuid}, state={State})...",
+                            description, uuid, txn.State);
+                        lastLoggedState = txn.State;
+                        lastStuckWarning = DateTime.UtcNow;
+                    }
+                    else if (txn.State == TransactionStateEnum.Pending
+                             && (DateTime.UtcNow - lastStuckWarning).TotalSeconds >= 60)
+                    {
+                        var elapsed = (DateTime.UtcNow - started).TotalSeconds;
+                        _log.LogWarning(
+                            "Transaction {Uuid} ({Desc}) has been Pending for {Elapsed:F0}s. " +
+                            "Confirm that a wallet daemon is signing transactions for account {Daemon}.",
+                            uuid, description, elapsed, _opts.DaemonWalletAddress);
+                        lastStuckWarning = DateTime.UtcNow;
+                    }
+
                     await Task.Delay(TimeSpan.FromSeconds(_opts.TransactionPollIntervalSeconds), ct);
                     break;
             }
