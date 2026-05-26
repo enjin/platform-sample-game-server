@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>PlatformSampleGameServer</RootNamespace>
+    <AssemblyName>PlatformSampleGameServer</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Reference the Enjin Platform C# SDK directly from the sibling repo for fast local
+      iteration. When the SDK is published to NuGet, swap this for a PackageReference.
+    -->
+    <ProjectReference Include="..\platform-csharp-sdk\src\Enjin.Platform.Sdk\Enjin.Platform.Sdk\Enjin.Platform.Sdk.csproj" />
+  </ItemGroup>
+
+</Project>
