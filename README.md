@@ -130,11 +130,10 @@ managed-wallet APIs.
 | Path | Purpose |
 |---|---|
 | `Program.cs` | Host setup, DI registration, JWT configuration, bootstrap orchestration, port binding. |
-| `Services/EnjinService.cs` | Every SDK call: collection bootstrap, managed wallet resolution, mint/melt/transfer, transaction polling, ENJ drip. |
+| `Services/EnjinService.cs` | Every SDK call: collection bootstrap, managed wallet resolution, mint/melt/transfer, transaction polling, ENJ drip. Also defines `ServerState`, the persisted state (`state.json`) holding the collection id and the set of `externalId`s already dripped. |
 | `Services/AuthService.cs` | Bcrypt password hashing, JWT issuance (`sub` + `email` claims). |
 | `Services/SubstrateAddress.cs` | SS58 encoder (Blake2b + base58check) used to convert managed-wallet public keys returned by the platform into SS58 addresses. |
 | `Services/Options.cs` | Strongly-typed config classes bound from `appsettings*.json`. |
-| `Services/ServerState.cs` | Persisted state (`state.json`): collection id, set of `externalId`s already dripped. |
 | `Endpoints/AuthEndpoints.cs` | `/api/auth/*` minimal-API routes. |
 | `Endpoints/WalletEndpoints.cs` | `/api/wallet/*` routes. |
 | `Endpoints/TokenEndpoints.cs` | `/api/token/*` routes. |

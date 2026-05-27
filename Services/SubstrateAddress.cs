@@ -81,7 +81,14 @@ public static class SubstrateAddress
         Buffer.BlockCopy(publicKey, 0, hashInput, Ss58Pre.Length + prefixBytes.Length, publicKey.Length);
 
         using var blake = new HMACBlake2B(512);
-        // HMACBlake2B with no key is plain Blake2b. The constructor takes the output size in bits.
+        // SS58 specifies an UNKEYED Blake2b-512 over "SS58PRE" || prefix || payload.
+        // Konscious's Blake2b is only exposed via the HMACBlake2B type, but when
+        // constructed without a key it does NOT perform the HMAC ipad/opad
+        // construction: it produces plain (unkeyed) Blake2b output identical to
+        // the standard test vectors (e.g. Blake2b-512("abc") matches RFC 7693).
+        // tools/Ss58SelfTest asserts this against the canonical Substrate
+        // Alice/Bob vectors so a library change that broke the equivalence would
+        // be caught immediately.
         var hash = blake.ComputeHash(hashInput);
 
         var full = new byte[prefixBytes.Length + publicKey.Length + 2];

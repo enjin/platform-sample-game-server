@@ -123,8 +123,15 @@ using (var scope = app.Services.CreateScope())
 {
     var sp = scope.ServiceProvider;
     var state = sp.GetRequiredService<ServerState>();
-    // Allow ENJIN_COLLECTION_ID env override to seed state on first run.
-    state.OverrideFromConfig(builder.Configuration["Enjin:CollectionId"]);
+    // Allow the operator to seed state.json on first run by supplying a
+    // collection id via configuration. Configuration:AddEnvironmentVariables
+    // accepts the standard double-underscore form (Enjin__CollectionId), but
+    // the legacy Node.js sample used the flat ENJIN_COLLECTION_ID name, so
+    // we accept that too as a fallback for operators migrating from the old
+    // server.
+    var collectionIdSeed = builder.Configuration["Enjin:CollectionId"]
+        ?? Environment.GetEnvironmentVariable("ENJIN_COLLECTION_ID");
+    state.OverrideFromConfig(collectionIdSeed);
 
     var log = sp.GetRequiredService<ILogger<Program>>();
 

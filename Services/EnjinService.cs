@@ -53,6 +53,15 @@ public sealed class EnjinService : IAsyncDisposable
             throw new InvalidOperationException("Enjin:ApiUrl is not configured.");
         if (string.IsNullOrWhiteSpace(_opts.ApiToken))
             throw new InvalidOperationException("Enjin:ApiToken is not configured.");
+        if (string.IsNullOrWhiteSpace(_opts.DaemonWalletAddress))
+            throw new InvalidOperationException(
+                "Enjin:DaemonWalletAddress is not configured. Set it to the SS58 address of your running wallet daemon.");
+        if (string.IsNullOrWhiteSpace(_opts.CollectionName))
+            throw new InvalidOperationException(
+                "Enjin:CollectionName is not configured. PrepareCollection needs a name to find or create a collection.");
+        if (_opts.ResourceTokens is null || _opts.ResourceTokens.Count == 0)
+            throw new InvalidOperationException(
+                "Enjin:ResourceTokens is empty. Configure at least one resource token definition (id, name, media).");
 
         _client = new PlatformClient(new Uri(_opts.ApiUrl), userAgent: "platform-sample-game-server/1.0");
         _client.Auth(_opts.ApiToken);
