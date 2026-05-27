@@ -11,7 +11,15 @@
 
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="Konscious.Security.Cryptography.Blake2" Version="1.1.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Out-of-band utilities live under tools/ and have their own .csproj. -->
+    <Compile Remove="tools/**" />
+    <None Remove="tools/**" />
+    <Content Remove="tools/**" />
   </ItemGroup>
 
   <ItemGroup>

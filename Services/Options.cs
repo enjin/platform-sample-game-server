@@ -18,6 +18,28 @@ public sealed class EnjinOptions
     // player's managed-wallet address as recipient.
     public string DaemonWalletAddress { get; set; } = "";
 
+    /// <summary>
+    /// SS58 prefix used to encode wallet public keys into addresses. Defaults to
+    /// 9030 (Enjin Matrixchain Canary). Use 1110 for Enjin Mainnet Matrixchain.
+    /// </summary>
+    public ushort Ss58Prefix { get; set; } = 9030;
+
+    /// <summary>
+    /// If true, the server transfers <see cref="DripEnjAmount"/> ENJ from the daemon
+    /// wallet to every newly created managed wallet exactly once. This is required
+    /// because the platform exposes no fuel-tank API on canary; managed wallets need
+    /// their own ENJ to cover transaction fees and storage reserves (e.g. for token
+    /// holding records minted into them).
+    /// </summary>
+    public bool DripEnjEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Amount of ENJ to drip to each new managed wallet, expressed in WHOLE ENJ
+    /// (integer; the platform scales by 10^18 on-chain). Default 1.
+    /// Note: the TransferEnj mutation does not support fractional amounts.
+    /// </summary>
+    public string DripEnjAmount { get; set; } = "1";
+
     public int TransactionPollIntervalSeconds { get; set; } = 10;
     public int TransactionInitialDelaySeconds { get; set; } = 10;
     public int ManagedWalletPollIntervalSeconds { get; set; } = 1;

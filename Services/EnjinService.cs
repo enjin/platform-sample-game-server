@@ -224,7 +224,13 @@ public sealed class EnjinService : IAsyncDisposable
     public async Task<string> EnsureManagedWalletAsync(string externalId, CancellationToken ct)
     {
         var existing = await GetManagedWalletAddressAsync(externalId, ct);
-        if (existing is not null) return existing;
+        if (existing is not null)
+        {
+            // Even for pre-existing wallets, drip once if we haven't yet.
+            // (Covers wallets created before drip was enabled.)
+            await DripIfNeededAsync(externalId, existing, ct);
+            return existing;
+        }
 
         var mutation = new MutationQueryBuilder().WithCreateManagedWallet(externalId);
         var resp = await _client.SendMutation(mutation);
@@ -234,7 +240,11 @@ public sealed class EnjinService : IAsyncDisposable
         for (var attempt = 1; attempt <= _opts.ManagedWalletPollMaxAttempts; attempt++)
         {
             var address = await GetManagedWalletAddressAsync(externalId, ct);
-            if (address is not null) return address;
+            if (address is not null)
+            {
+                await DripIfNeededAsync(externalId, address, ct);
+                return address;
+            }
             await Task.Delay(TimeSpan.FromSeconds(_opts.ManagedWalletPollIntervalSeconds), ct);
         }
 
@@ -243,22 +253,49 @@ public sealed class EnjinService : IAsyncDisposable
             $"after {_opts.ManagedWalletPollMaxAttempts} attempts.");
     }
 
-    private async Task<string> ResolveAddressAsync(string publicKey, CancellationToken ct)
+    /// <summary>
+    /// Transfer a fixed amount of ENJ from the daemon wallet to a managed wallet,
+    /// once per externalId. Required so the managed wallet can pay transaction fees
+    /// and the storage reserve for token holding records (canary platform has no
+    /// fuel-tank API to do this in-band).
+    /// </summary>
+    private async Task DripIfNeededAsync(string externalId, string recipientAddress, CancellationToken ct)
     {
-        // GetAccount accepts a public key OR SS58 address; pass the public key to
-        // receive the canonical SS58 form on Address.
-        var query = new QueryQueryBuilder().WithGetAccount(
-            new AccountQueryBuilder().WithId().WithAddress(),
-            _network, _chain, address: publicKey);
-
-        var resp = await _client.SendQuery(query);
-        EnsureSuccess(resp, "GetAccount");
-        var account = resp.Result.Data?.GetAccount;
-        if (account?.Address is null)
+        if (!_opts.DripEnjEnabled) return;
+        if (_state.HasDripped(externalId)) return;
+        if (!BigInteger.TryParse(_opts.DripEnjAmount, out var amount) || amount.IsZero || amount.Sign < 0)
         {
-            throw new InvalidOperationException($"Could not resolve SS58 address for public key {publicKey}.");
+            _log.LogWarning("DripEnjAmount '{Amount}' is invalid; skipping drip for {ExternalId}.",
+                _opts.DripEnjAmount, externalId);
+            return;
         }
-        return account.Address;
+
+        _log.LogInformation(
+            "Dripping {Amount} ENJ from daemon to managed wallet {Address} (externalId={ExternalId}).",
+            amount, recipientAddress, externalId);
+
+        var input = new TransactionInput
+        {
+            TransferEnj = new TransferEnjInput
+            {
+                Recipient = recipientAddress,
+                Amount = amount,
+            },
+        };
+
+        // Signed by the daemon (signerExternalId: null).
+        await SubmitAndWaitAsync(input, signerExternalId: null, $"drip ENJ to {externalId}", ct);
+        _state.RecordDripped(externalId);
+    }
+
+    private Task<string> ResolveAddressAsync(string publicKey, CancellationToken ct)
+    {
+        // The v3 platform's GetAccount(address:) requires an SS58 string; ManagedWallet
+        // only exposes the public key as hex. There is no platform-side helper, so we
+        // SS58-encode locally using the configured network prefix.
+        // (Enjin Matrix Canary = 9030, Mainnet Matrix = 1110.)
+        var address = SubstrateAddress.Encode(publicKey, _opts.Ss58Prefix);
+        return Task.FromResult(address);
     }
 
     // ------------------------------------------------------------------
@@ -276,56 +313,70 @@ public sealed class EnjinService : IAsyncDisposable
         var wallet = mwResp.Result.Data?.GetManagedWallet;
         if (wallet?.PublicKey is null) return null;
 
-        // Step 2: fetch the account (resolves SS58 + lists held tokens).
         var collectionId = _state.CollectionId
             ?? throw new InvalidOperationException("Collection ID not initialised; PrepareCollection has not run.");
 
-        var accountQuery = new QueryQueryBuilder().WithGetAccount(
-            new AccountQueryBuilder()
-                .WithId()
-                .WithAddress()
-                .WithTokens(
-                    new TokenQueryBuilder()
-                        .WithTokenId()
-                        .WithCollection(new CollectionQueryBuilder().WithId())
-                        .WithAttributes(new AttributeQueryBuilder().WithKey().WithValue())
-                        .WithHolders(new TokenHolderQueryBuilder().WithAddress().WithAmount(), limit: 50, page: 1),
-                    limit: 100,
-                    collectionId: collectionId),
-            _network, _chain, address: wallet.PublicKey);
+        var ss58Address = SubstrateAddress.Encode(wallet.PublicKey, _opts.Ss58Prefix);
 
-        var accountResp = await _client.SendQuery(accountQuery);
-        EnsureSuccess(accountResp, "GetAccount(tokens)");
-        var account = accountResp.Result.Data?.GetAccount;
-        if (account?.Address is null) return null;
+        // Step 2: for each resource token we know exists in the collection, query
+        // the token's holder list and look for this player's address.
+        //
+        // The Enjin canary platform exposes `holders` only via the singular
+        // `GetToken(collectionId, tokenId)` query; the same field returns null
+        // when nested under `GetTokens` or `Account.tokens`. So we issue one
+        // query per resource token. With ~3 tokens this is fine; we run them
+        // in parallel.
+        var holderTasks = _opts.ResourceTokens
+            .Select(rt => FetchTokenForHolderAsync(collectionId, new BigInteger(rt.Id), ss58Address, ct))
+            .ToList();
+        var tokenAccountResults = await Task.WhenAll(holderTasks);
 
-        // Per-holder balance: scan Token.Holders for this address. Account.Tokens does
-        // not expose a balance scalar, so we cross-reference here.
-        var tokenAccounts = new List<Models.TokenAccountDto>();
-        foreach (var token in account.Tokens ?? Array.Empty<Token>())
-        {
-            var holderBalance = token.Holders?
-                .Where(h => string.Equals(h.Address, account.Address, StringComparison.OrdinalIgnoreCase))
-                .Select(h => h.Amount)
-                .FirstOrDefault() ?? BigInteger.Zero;
-
-            if (holderBalance.IsZero) continue;
-
-            var attrs = (token.Attributes ?? Enumerable.Empty<Enjin.Platform.Sdk.Attribute>())
-                .Select(a => new Models.AttributeDto(a.Key ?? "", a.Value ?? ""))
-                .ToList();
-
-            tokenAccounts.Add(new Models.TokenAccountDto(
-                Balance: holderBalance.ToString(),
-                Token: new Models.TokenDto(
-                    Collection: new Models.CollectionDto(token.Collection?.Id.ToString() ?? collectionId.ToString()),
-                    TokenId: token.TokenId ?? "",
-                    Attributes: attrs)));
-        }
+        var tokenAccounts = tokenAccountResults
+            .Where(t => t is not null)
+            .Select(t => t!)
+            .ToList();
 
         return new Models.ManagedWalletAccountDto(
-            Account: new Models.AccountDto(PublicKey: account.Id ?? wallet.PublicKey, Address: account.Address),
+            Account: new Models.AccountDto(PublicKey: wallet.PublicKey, Address: ss58Address),
             TokenAccounts: tokenAccounts);
+    }
+
+    private async Task<Models.TokenAccountDto?> FetchTokenForHolderAsync(
+        BigInteger collectionId, BigInteger tokenId, string holderAddress, CancellationToken ct)
+    {
+        var query = new QueryQueryBuilder().WithGetToken(
+            new TokenQueryBuilder()
+                .WithTokenId()
+                .WithCollection(new CollectionQueryBuilder().WithId())
+                .WithAttributes(new AttributeQueryBuilder().WithKey().WithValue())
+                .WithHolders(new TokenHolderQueryBuilder().WithAddress().WithAmount(), limit: 50, page: 1),
+            _network, _chain,
+            id: null,
+            collectionId: collectionId,
+            tokenId: tokenId);
+
+        var resp = await _client.SendQuery(query);
+        EnsureSuccess(resp, $"GetToken(collection={collectionId}, token={tokenId})");
+        var token = resp.Result.Data?.GetToken;
+        if (token is null) return null;
+
+        var holderBalance = token.Holders?
+            .Where(h => string.Equals(h.Address, holderAddress, StringComparison.OrdinalIgnoreCase))
+            .Select(h => h.Amount)
+            .FirstOrDefault() ?? BigInteger.Zero;
+
+        if (holderBalance.IsZero) return null;
+
+        var attrs = (token.Attributes ?? Enumerable.Empty<Enjin.Platform.Sdk.Attribute>())
+            .Select(a => new Models.AttributeDto(a.Key ?? "", a.Value ?? ""))
+            .ToList();
+
+        return new Models.TokenAccountDto(
+            Balance: holderBalance.ToString(),
+            Token: new Models.TokenDto(
+                Collection: new Models.CollectionDto(token.Collection?.Id.ToString() ?? collectionId.ToString()),
+                TokenId: token.TokenId ?? tokenId.ToString(),
+                Attributes: attrs));
     }
 
     // ------------------------------------------------------------------
@@ -505,12 +556,14 @@ public sealed class EnjinService : IAsyncDisposable
     }
 }
 
-// Process-local mutable state. Currently just the bootstrapped collection ID,
-// persisted to state.json so we don't re-create the collection on every restart.
+// Process-local mutable state. Persisted to state.json so we don't redo work
+// on every restart: bootstrapped collection ID, and the set of managed-wallet
+// externalIds we've already ENJ-dripped (so we never double-drip the same player).
 public sealed class ServerState
 {
     private readonly string _path;
     private BigInteger? _collectionId;
+    private readonly HashSet<string> _drippedExternalIds = new(StringComparer.Ordinal);
     private readonly object _lock = new();
 
     public ServerState(IHostEnvironment env)
@@ -530,6 +583,19 @@ public sealed class ServerState
         {
             _collectionId = id;
             Persist();
+        }
+    }
+
+    public bool HasDripped(string externalId)
+    {
+        lock (_lock) { return _drippedExternalIds.Contains(externalId); }
+    }
+
+    public void RecordDripped(string externalId)
+    {
+        lock (_lock)
+        {
+            if (_drippedExternalIds.Add(externalId)) Persist();
         }
     }
 
@@ -558,6 +624,18 @@ public sealed class ServerState
             {
                 _collectionId = parsed;
             }
+            if (doc.RootElement.TryGetProperty("drippedExternalIds", out var arr)
+                && arr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in arr.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.String)
+                    {
+                        var s = item.GetString();
+                        if (!string.IsNullOrEmpty(s)) _drippedExternalIds.Add(s);
+                    }
+                }
+            }
         }
         catch
         {
@@ -567,7 +645,11 @@ public sealed class ServerState
 
     private void Persist()
     {
-        var payload = new { collectionId = _collectionId?.ToString() };
+        var payload = new
+        {
+            collectionId = _collectionId?.ToString(),
+            drippedExternalIds = _drippedExternalIds.OrderBy(s => s).ToArray(),
+        };
         File.WriteAllText(_path, JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }));
     }
 }
