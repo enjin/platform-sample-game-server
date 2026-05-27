@@ -25,7 +25,15 @@ public sealed record AuthResponse(string Email, string? Wallet, string Token);
 public sealed record BoolResponse(bool Success, string? Message = null);
 
 // Mirrors PlatformModels.ManagedWalletAccount on the Unity side.
-public sealed record ManagedWalletAccountDto(AccountDto Account, IReadOnlyList<TokenAccountDto> TokenAccounts);
+//
+// CollectionId is the on-chain collection that owns every resource token the
+// client cares about. We surface it here (instead of as a constant on the
+// client) because the server allocates or reuses it at startup and the value
+// can change across canary resets.
+public sealed record ManagedWalletAccountDto(
+    AccountDto Account,
+    IReadOnlyList<TokenAccountDto> TokenAccounts,
+    string CollectionId);
 
 public sealed record AccountDto(string PublicKey, string Address);
 

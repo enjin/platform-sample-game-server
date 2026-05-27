@@ -338,7 +338,8 @@ public sealed class EnjinService : IAsyncDisposable
 
         return new Models.ManagedWalletAccountDto(
             Account: new Models.AccountDto(PublicKey: wallet.PublicKey, Address: ss58Address),
-            TokenAccounts: tokenAccounts);
+            TokenAccounts: tokenAccounts,
+            CollectionId: collectionId.ToString());
     }
 
     private async Task<Models.TokenAccountDto?> FetchTokenForHolderAsync(
