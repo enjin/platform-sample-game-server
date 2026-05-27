@@ -53,7 +53,7 @@ public sealed class AuthService
         if (string.IsNullOrWhiteSpace(_jwt.Secret))
         {
             throw new InvalidOperationException(
-                "Jwt:Secret is not configured. Set it in appsettings.Development.json or an env var.");
+                "Jwt:Secret is not configured. Set it in appsettings.Local.json or an env var.");
         }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Secret));

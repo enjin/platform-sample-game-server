@@ -22,8 +22,10 @@ public static class AuthEndpoints
                 AuthRequest body,
                 AuthService auth,
                 EnjinService enjin,
+                ILoggerFactory loggerFactory,
                 CancellationToken ct) =>
             {
+                var log = loggerFactory.CreateLogger("PlatformSampleGameServer.Endpoints.AuthEndpoints");
                 try
                 {
                     var (token, email) = auth.RegisterOrLogin(body.Email, body.Password);
@@ -40,7 +42,7 @@ public static class AuthEndpoints
                         // Don't fail registration on a wallet-provisioning hiccup;
                         // the client can retry against /api/wallet/get-tokens later.
                         wallet = null;
-                        Console.Error.WriteLine($"EnsureManagedWallet failed for {email}: {ex.Message}");
+                        log.LogWarning(ex, "EnsureManagedWallet failed for {Email}", email);
                     }
 
                     return Results.Ok(new AuthResponse(email, wallet, token));

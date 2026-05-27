@@ -50,6 +50,15 @@ if (string.IsNullOrWhiteSpace(jwt.Secret))
     jwt.Secret = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
     Console.WriteLine("[warn] Jwt:Secret not configured; generated a transient dev secret. " +
                       "Set Jwt:Secret in appsettings or env for stable sessions across restarts.");
+
+    // Propagate the generated secret into the bound JwtOptions so AuthService
+    // (which resolves IOptions<JwtOptions>) signs tokens with the same key that
+    // the JwtBearer middleware validates against. Without this, AuthService
+    // would either throw on an empty Secret or sign with a different key.
+    builder.Services.PostConfigure<JwtOptions>(o =>
+    {
+        if (string.IsNullOrWhiteSpace(o.Secret)) o.Secret = jwt.Secret;
+    });
 }
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -74,12 +83,26 @@ var serverOptions = builder.Configuration.GetSection("Server").Get<ServerOptions
 builder.WebHost.ConfigureKestrel(k =>
 {
     k.ListenAnyIP(serverOptions.Port);
-    k.Limits.KeepAliveTimeout = TimeSpan.FromSeconds(serverOptions.RequestTimeoutSeconds);
+});
+
+// Long-running on-chain operations (mint/melt/transfer) can legitimately take
+// several minutes while we poll for finalization. Configure a per-request
+// execution timeout via the ASP.NET Core RequestTimeouts middleware so the
+// server cancels requests that exceed Server:RequestTimeoutSeconds instead of
+// letting them run indefinitely. (KeepAliveTimeout is intentionally left at
+// its default; it controls idle connection lifetime, not request duration.)
+builder.Services.AddRequestTimeouts(o =>
+{
+    o.DefaultPolicy = new Microsoft.AspNetCore.Http.Timeouts.RequestTimeoutPolicy
+    {
+        Timeout = TimeSpan.FromSeconds(serverOptions.RequestTimeoutSeconds),
+    };
 });
 
 var app = builder.Build();
 
 app.UseCors();
+app.UseRequestTimeouts();
 app.UseAuthentication();
 app.UseAuthorization();
 

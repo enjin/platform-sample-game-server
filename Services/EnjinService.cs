@@ -276,6 +276,17 @@ public sealed class EnjinService : IAsyncDisposable
             return;
         }
 
+        // Atomic guard: only one concurrent caller proceeds per externalId.
+        // Without this, two simultaneous EnsureManagedWalletAsync calls for the
+        // same player could both pass HasDripped, both await TransferEnj, and
+        // double-drip. TryBeginDrip marks the externalId as "in progress"
+        // synchronously; we clear it on failure so a later attempt can retry.
+        if (!_state.TryBeginDrip(externalId))
+        {
+            _log.LogDebug("Drip already in progress or completed for {ExternalId}; skipping.", externalId);
+            return;
+        }
+
         _log.LogInformation(
             "Dripping {Amount} ENJ from daemon to managed wallet {Address} (externalId={ExternalId}).",
             amount, recipientAddress, externalId);
@@ -289,9 +300,18 @@ public sealed class EnjinService : IAsyncDisposable
             },
         };
 
-        // Signed by the daemon (signerExternalId: null).
-        await SubmitAndWaitAsync(input, signerExternalId: null, $"drip ENJ to {externalId}", ct);
-        _state.RecordDripped(externalId);
+        try
+        {
+            // Signed by the daemon (signerExternalId: null).
+            await SubmitAndWaitAsync(input, signerExternalId: null, $"drip ENJ to {externalId}", ct);
+            _state.RecordDripped(externalId);
+        }
+        catch
+        {
+            // Clear the in-progress flag so a later attempt can retry.
+            _state.CancelDrip(externalId);
+            throw;
+        }
     }
 
     private Task<string> ResolveAddressAsync(string publicKey, CancellationToken ct)
@@ -569,7 +589,15 @@ public sealed class ServerState
 {
     private readonly string _path;
     private BigInteger? _collectionId;
-    private readonly HashSet<string> _drippedExternalIds = new(StringComparer.Ordinal);
+    // Case-insensitive to match UserStore (OrdinalIgnoreCase). externalId is an
+    // email, and "Alice@x.com" / "alice@x.com" are the same user; tracking them
+    // separately here would let the same player be dripped twice.
+    private readonly HashSet<string> _drippedExternalIds = new(StringComparer.OrdinalIgnoreCase);
+    // In-flight drips. Not persisted; lives only for the lifetime of the process
+    // and exists purely to serialise concurrent EnsureManagedWalletAsync calls
+    // for the same externalId so we never submit two TransferEnj transactions
+    // for a single player.
+    private readonly HashSet<string> _drippingInFlight = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _lock = new();
 
     public ServerState(IHostEnvironment env)
@@ -597,10 +625,32 @@ public sealed class ServerState
         lock (_lock) { return _drippedExternalIds.Contains(externalId); }
     }
 
+    /// <summary>
+    /// Atomically reserves an externalId for drip. Returns true if the caller
+    /// should proceed with the on-chain transfer; false if the externalId has
+    /// already been dripped, or another caller is currently dripping it.
+    /// Pair every <c>true</c> return with either <see cref="RecordDripped"/>
+    /// on success or <see cref="CancelDrip"/> on failure.
+    /// </summary>
+    public bool TryBeginDrip(string externalId)
+    {
+        lock (_lock)
+        {
+            if (_drippedExternalIds.Contains(externalId)) return false;
+            return _drippingInFlight.Add(externalId);
+        }
+    }
+
+    public void CancelDrip(string externalId)
+    {
+        lock (_lock) { _drippingInFlight.Remove(externalId); }
+    }
+
     public void RecordDripped(string externalId)
     {
         lock (_lock)
         {
+            _drippingInFlight.Remove(externalId);
             if (_drippedExternalIds.Add(externalId)) Persist();
         }
     }
