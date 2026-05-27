@@ -26,8 +26,10 @@ client works unchanged.
 
 - [.NET 9 SDK](https://dotnet.microsoft.com/download).
 - The [Enjin Platform C# SDK](https://github.com/enjin/platform-csharp-sdk)
-  checked out as a sibling directory (this project references the SDK via a
-  `ProjectReference`; see `PlatformSampleGameServer.csproj`).
+  v3.0.0 or later, pulled from NuGet automatically on `dotnet restore`.
+  (For local development against an unreleased SDK, swap the
+  `PackageReference` in `PlatformSampleGameServer.csproj` for the commented-out
+  `ProjectReference` and check the SDK out as a sibling directory.)
 - An Enjin Platform account and a generated API token.
 - A running [Wallet Daemon](https://docs.enjin.io/products/wallet-daemon)
   configured with the same API token; its SS58 address is what you'll set as
@@ -38,16 +40,12 @@ client works unchanged.
 
 ## Setup
 
-1. **Clone next to the SDK:**
+1. **Clone the repo:**
 
    ```bash
-   git clone https://github.com/enjin/platform-csharp-sdk.git
    git clone https://github.com/enjin/platform-sample-game-server.git
    cd platform-sample-game-server
    ```
-
-   The `.csproj` expects `../platform-csharp-sdk/...` to exist. If you put the
-   SDK somewhere else, edit the `ProjectReference` path.
 
 2. **Create a local config:**
 
