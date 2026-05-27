@@ -87,6 +87,7 @@ app.UseAuthorization();
 app.MapAuthEndpoints();
 app.MapWalletEndpoints();
 app.MapTokenEndpoints();
+app.MapSetupEndpoints();
 
 // ----- Bootstrap the collection + resource tokens before serving any requests -----
 // Pass --skip-bootstrap (or set Enjin:SkipBootstrap=true) to start the server

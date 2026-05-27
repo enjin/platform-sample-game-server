@@ -1,75 +1,153 @@
-# Introduction
+# Platform Sample Game Server (C#)
 
-This is a NodeJS Express RESTful server for a sample Unity game [Enjin Farmer](https://github.com/enjin/platform-sample-game-client-unity), designed to demonstrate how to easily integrate NFTs into a project using the Enjin Platform.
+REST backend for the **Enjin Farmer** Unity sample
+([platform-sample-game-client-unity](https://github.com/enjin/platform-sample-game-client-unity)),
+demonstrating how to integrate NFTs into a game using the
+[Enjin Platform C# SDK](https://github.com/enjin/platform-csharp-sdk).
 
-## Overview
+This is a rewrite of the previous Node.js server in .NET 9. The wire format
+(JSON shape, route paths, JWT handling) is preserved so the existing Unity
+client works unchanged.
 
-This server provides the backend functionality for managing NFTs within the sample Unity game. It handles user authentication, wallet management, and token operations (minting, melting, and transferring) using the Enjin Platform API.
+## What this server does
 
-## Features
-
-*   User registration and login
-*   Managed wallet creation and retrieval
-*   Token minting, melting, and transfer
-*   Health check endpoint
+- Holds the Enjin Platform API key. The Unity client never sees it.
+- Bootstraps an on-chain **collection** and a fixed set of **resource tokens**
+  the game uses (Gold Coin, Gold Coin Blue, Green Gem) on first run.
+- Issues players a JWT after `/api/auth/register` so subsequent calls can
+  identify them.
+- Creates a managed wallet per player (one managed wallet per `externalId`,
+  where `externalId == email`) and drips a small amount of ENJ to it so it
+  can pay transaction fees.
+- Brokers mint / melt / transfer mutations to the platform and waits for
+  on-chain finalization before responding to the client.
 
 ## Prerequisites
 
-*   Node.js and npm installed
-*   An Enjin Platform account and API key
-*   Wallet Daemon
-*   Aquire cENJ from the [Canary Faucet](https://faucet.canary.enjin.io/) to fund the Wallet Daemon account
+- [.NET 9 SDK](https://dotnet.microsoft.com/download).
+- The [Enjin Platform C# SDK](https://github.com/enjin/platform-csharp-sdk)
+  checked out as a sibling directory (this project references the SDK via a
+  `ProjectReference`; see `PlatformSampleGameServer.csproj`).
+- An Enjin Platform account and a generated API token.
+- A running [Wallet Daemon](https://docs.enjin.io/products/wallet-daemon)
+  configured with the same API token; its SS58 address is what you'll set as
+  `DaemonWalletAddress` below.
+- cENJ in the daemon's wallet (use the
+  [Canary Faucet](https://faucet.canary.enjin.io/)) to pay for collection
+  creation, mints, and drips to new players.
 
-## Setup Instructions
+## Setup
 
-1.  **Clone the repository:**
+1. **Clone next to the SDK:**
 
-    ```bash
-    git clone https://github.com/enjin/platform-sample-game-server.git
-    cd platform-sample-game-server
-    ```
+   ```bash
+   git clone https://github.com/enjin/platform-csharp-sdk.git
+   git clone https://github.com/enjin/platform-sample-game-server.git
+   cd platform-sample-game-server
+   ```
 
-2.  **Install dependencies:**
+   The `.csproj` expects `../platform-csharp-sdk/...` to exist. If you put the
+   SDK somewhere else, edit the `ProjectReference` path.
 
-    ```bash
-    npm install
-    ```
+2. **Create a local config:**
 
-3.  **Configure environment variables:**
+   Copy `appsettings.Sample.json` to `appsettings.Local.json` (gitignored)
+   and fill in:
 
-    Duplicate the `.env.example` file and rename the copy to `.env`.
-    Open the `.env` file and fill in the following variables:
-    - `PORT=3000` (You can change this if port 3000 is already in use).
-    - `JWT_SECRET`: Generate a secure, random string. This is used for authenticating players.
-    - `ENJIN_API_URL`: Keep the default `https://platform.canary.enjin.io/graphql` for testing on the Canary network.
-    - `ENJIN_API_KEY`: Paste the **API Key Token** from your Enjin Platform account.
-    - `DAEMON_WALLET_ADDRESS`: Paste the wallet address you copied from the Wallet Daemon UI.
-    - `ENJIN_COLLECTION_ID`: Leave this blank, it will be automatically populated once the collection is created.
+   - `Jwt.Secret` &mdash; any long random string (32+ chars).
+   - `Enjin.ApiToken` &mdash; your platform API token.
+   - `Enjin.DaemonWalletAddress` &mdash; the SS58 address of your running
+     wallet daemon, on the same network/chain (default Canary Matrix; uses
+     SS58 prefix 9030).
 
-4.  **Run the server:**
+   You can leave the rest of `appsettings.json` alone. Notable defaults:
 
-    ```bash
-    npm start
-    ```
+   | Setting | Default | Meaning |
+   |---|---|---|
+   | `Server.Port` | `3000` | HTTP listen port. The Unity client expects 3000 by default. |
+   | `Enjin.ApiUrl` | Canary GraphQL | Switch to production when you ship. |
+   | `Enjin.Network` / `Enjin.Chain` | `Canary` / `Matrix` | |
+   | `Enjin.ResourceTokens` | three entries | The Unity client has matching `EnjinItem` assets for `Id` 1, 2, 3. |
+   | `Enjin.CollectionName` | `Enjin Sample Game` | Used to find or reuse an existing collection so you don't create a new one every run. |
+   | `Enjin.Ss58Prefix` | `9030` | Matrix prefix; change if you target a different chain. |
+   | `Enjin.DripEnjEnabled` / `Enjin.DripEnjAmount` | `true` / `"1"` | Each new managed wallet gets 1 ENJ from the daemon so it can pay fees. |
 
-    On the first server launch, a collection will be created, along with the resources tokens.
-    Once these are created, the server will run on port 3000.
+3. **Run the server:**
 
-## API Endpoints
+   ```bash
+   dotnet run
+   ```
 
-- `/api/auth/health-check`: Perform a health check to ensure the server is running and authentication is working.
-- `/api/auth/register`: User registration
-- `/api/auth/login`: User login
-- `/api/wallet/create`: Create a managed wallet
-- `/api/wallet/get`: Get a managed wallet
-- `/api/wallet/get-tokens`: Get a managed wallet and its tokens
-- `/api/token/mint`: Mint token
-- `/api/token/melt`: Melt token
-- `/api/token/transfer`: Transfer token
+   On first launch the server:
 
-## Full Documentation
+   1. Looks for an existing collection owned by the daemon and named
+      `Enjin.CollectionName`. If absent, creates one and waits for the
+      `CreateCollection` transaction to finalize (~10&ndash;20s).
+   2. Creates each entry in `Enjin.ResourceTokens` as a token in that
+      collection. (Skipped on subsequent runs.)
+   3. Persists the resulting `collectionId` to `state.json` so subsequent
+      runs reuse it.
 
-For more in-depth information about the Enjin Platform and its features, please refer to the official documentation:
+   When you see `Server listening on http://0.0.0.0:3000` it's ready.
 
-* [Setup Guide](https://docs.enjin.io/guides/platform/enjin-farmer-sample-game/setup-guide)
-* [Implementation Breakdown](https://docs.enjin.io/guides/platform/enjin-farmer-sample-game/implementation-breakdown)
+4. **Stamp the collection ID into the Unity client.**
+
+   In the Unity Editor, run:
+
+   > Enjin &rarr; Stamp Collection ID onto EnjinItem Assets
+
+   The Editor calls `GET /api/setup/collection-id`, then writes the value
+   onto every `EnjinItem` ScriptableObject (Gold Coin, Gold Coin Blue,
+   Green Gem). Commit those `.asset` files. **Do this once after first
+   server bootstrap, and again if the canary state ever resets and forces a
+   new collection.**
+
+   If you skip this step, the Unity backpack UI will show no tokens because
+   it filters by `(collectionId, tokenId)` against your wallet's holdings.
+
+## Optional flags
+
+- `dotnet run -- --skip-bootstrap` &mdash; start the HTTP server without
+  trying to allocate a collection. Useful when canary is misbehaving and you
+  just want to inspect requests.
+
+## API endpoints
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET  | `/api/auth/health-check` | none | Liveness probe. |
+| POST | `/api/auth/register`     | none | Register *or* log in (same call). Returns a JWT. |
+| GET  | `/api/wallet/get-tokens` | JWT  | Player's managed wallet + the resource-token balances they hold. |
+| POST | `/api/token/mint`        | JWT  | Daemon-signed mint of `tokenId` into the caller's managed wallet. |
+| POST | `/api/token/melt`        | JWT  | Player-signed burn of `tokenId` from the caller's managed wallet. |
+| POST | `/api/token/transfer`    | JWT  | Player-signed transfer of `tokenId` to an SS58 address. |
+| GET  | `/api/setup/collection-id` | none | One-shot read used by the Unity Editor setup menu. Returns `{"collectionId":"..."}`. |
+
+Every JWT-protected route reads the `email` claim (the player identifier)
+and uses it as the `externalId` when talking to the Enjin Platform's
+managed-wallet APIs.
+
+## Source map
+
+| Path | Purpose |
+|---|---|
+| `Program.cs` | Host setup, DI registration, JWT configuration, bootstrap orchestration, port binding. |
+| `Services/EnjinService.cs` | Every SDK call: collection bootstrap, managed wallet resolution, mint/melt/transfer, transaction polling, ENJ drip. |
+| `Services/AuthService.cs` | Bcrypt password hashing, JWT issuance (`sub` + `email` claims). |
+| `Services/SubstrateAddress.cs` | SS58 encoder (Blake2b + base58check) used to convert managed-wallet public keys returned by the platform into SS58 addresses. |
+| `Services/Options.cs` | Strongly-typed config classes bound from `appsettings*.json`. |
+| `Services/ServerState.cs` | Persisted state (`state.json`): collection id, set of `externalId`s already dripped. |
+| `Endpoints/AuthEndpoints.cs` | `/api/auth/*` minimal-API routes. |
+| `Endpoints/WalletEndpoints.cs` | `/api/wallet/*` routes. |
+| `Endpoints/TokenEndpoints.cs` | `/api/token/*` routes. |
+| `Endpoints/SetupEndpoints.cs` | `/api/setup/*` routes (called by Unity Editor tooling). |
+| `Models/Dtos.cs` | Request/response records (`*Dto`, `*Request`, `*Response`). |
+| `tools/Ss58SelfTest/` | Tiny console app that verifies the SS58 encoder against published Polkadot/Substrate test vectors. Run with `dotnet run --project tools/Ss58SelfTest`. |
+
+`appsettings.Local.json`, `state.json`, and `bin/` `obj/` are gitignored.
+
+## Further reading
+
+- [Enjin Platform C# SDK](https://github.com/enjin/platform-csharp-sdk)
+- [Enjin Farmer setup guide](https://docs.enjin.io/guides/platform/enjin-farmer-sample-game/setup-guide)
+- [Implementation breakdown](https://docs.enjin.io/guides/platform/enjin-farmer-sample-game/implementation-breakdown)

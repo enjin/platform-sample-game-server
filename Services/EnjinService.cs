@@ -35,6 +35,12 @@ public sealed class EnjinService : IAsyncDisposable
     private readonly Network _network;
     private readonly Chain _chain;
 
+    /// <summary>
+    /// On-chain collection id allocated (or reused) during bootstrap. Null
+    /// until <c>PrepareCollectionAsync</c> has run.
+    /// </summary>
+    public BigInteger? CollectionId => _state.CollectionId;
+
     public EnjinService(IOptions<EnjinOptions> opts, ServerState state, ILogger<EnjinService> log)
     {
         _opts = opts.Value;
@@ -338,8 +344,7 @@ public sealed class EnjinService : IAsyncDisposable
 
         return new Models.ManagedWalletAccountDto(
             Account: new Models.AccountDto(PublicKey: wallet.PublicKey, Address: ss58Address),
-            TokenAccounts: tokenAccounts,
-            CollectionId: collectionId.ToString());
+            TokenAccounts: tokenAccounts);
     }
 
     private async Task<Models.TokenAccountDto?> FetchTokenForHolderAsync(

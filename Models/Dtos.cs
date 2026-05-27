@@ -25,15 +25,14 @@ public sealed record AuthResponse(string Email, string? Wallet, string Token);
 public sealed record BoolResponse(bool Success, string? Message = null);
 
 // Mirrors PlatformModels.ManagedWalletAccount on the Unity side.
-//
-// CollectionId is the on-chain collection that owns every resource token the
-// client cares about. We surface it here (instead of as a constant on the
-// client) because the server allocates or reuses it at startup and the value
-// can change across canary resets.
-public sealed record ManagedWalletAccountDto(
-    AccountDto Account,
-    IReadOnlyList<TokenAccountDto> TokenAccounts,
-    string CollectionId);
+public sealed record ManagedWalletAccountDto(AccountDto Account, IReadOnlyList<TokenAccountDto> TokenAccounts);
+
+// Returned by GET /api/setup/collection-id. The Unity Editor calls this once
+// during studio setup to stamp the on-chain collection id onto each
+// EnjinItem ScriptableObject; the running game itself never calls it. The
+// server allocates the collection during bootstrap (Program.cs) and persists
+// the id in state.json, so this endpoint is a stable read after that.
+public sealed record CollectionIdResponse(string CollectionId);
 
 public sealed record AccountDto(string PublicKey, string Address);
 
