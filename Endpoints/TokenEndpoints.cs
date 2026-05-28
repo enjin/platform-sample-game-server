@@ -11,40 +11,70 @@ public static class TokenEndpoints
     {
         var group = app.MapGroup("/api/token").RequireAuthorization();
 
-        group.MapPost("/mint", async (
+        group.MapPost(
+            "/mint",
+            async (
                 MintRequest req,
                 ClaimsPrincipal user,
                 EnjinService enjin,
-                CancellationToken ct) =>
-            await Run("mint", req.TokenId, req.Amount, user, async (tokenId, amount, email) =>
-            {
-                // Mint to the player's wallet. The daemon signs implicitly.
-                var address = await enjin.EnsureManagedWalletAsync(email, ct);
-                await enjin.MintTokenAsync(tokenId, amount, address, ct);
-            }));
+                CancellationToken ct
+            ) =>
+                await Run(
+                    "mint",
+                    req.TokenId,
+                    req.Amount,
+                    user,
+                    async (tokenId, amount, email) =>
+                    {
+                        // Mint to the player's wallet. The daemon signs implicitly.
+                        var address = await enjin.EnsureManagedWalletAsync(email, ct);
+                        await enjin.MintTokenAsync(tokenId, amount, address, ct);
+                    }
+                )
+        );
 
-        group.MapPost("/melt", async (
+        group.MapPost(
+            "/melt",
+            async (
                 MeltRequest req,
                 ClaimsPrincipal user,
                 EnjinService enjin,
-                CancellationToken ct) =>
-            await Run("melt", req.TokenId, req.Amount, user, async (tokenId, amount, email) =>
-            {
-                // Burn from the player's wallet; daemon signs on their behalf via externalId.
-                await enjin.MeltTokenAsync(tokenId, amount, email, ct);
-            }));
+                CancellationToken ct
+            ) =>
+                await Run(
+                    "melt",
+                    req.TokenId,
+                    req.Amount,
+                    user,
+                    async (tokenId, amount, email) =>
+                    {
+                        // Burn from the player's wallet; daemon signs on their behalf via externalId.
+                        await enjin.MeltTokenAsync(tokenId, amount, email, ct);
+                    }
+                )
+        );
 
-        group.MapPost("/transfer", async (
+        group.MapPost(
+            "/transfer",
+            async (
                 TransferRequest req,
                 ClaimsPrincipal user,
                 EnjinService enjin,
-                CancellationToken ct) =>
-            await Run("transfer", req.TokenId, req.Amount, user, async (tokenId, amount, email) =>
-            {
-                if (string.IsNullOrWhiteSpace(req.Recipient))
-                    throw new ArgumentException("Recipient is required.");
-                await enjin.TransferTokenAsync(tokenId, amount, req.Recipient, email, ct);
-            }));
+                CancellationToken ct
+            ) =>
+                await Run(
+                    "transfer",
+                    req.TokenId,
+                    req.Amount,
+                    user,
+                    async (tokenId, amount, email) =>
+                    {
+                        if (string.IsNullOrWhiteSpace(req.Recipient))
+                            throw new ArgumentException("Recipient is required.");
+                        await enjin.TransferTokenAsync(tokenId, amount, req.Recipient, email, ct);
+                    }
+                )
+        );
     }
 
     private static async Task<IResult> Run(
@@ -52,15 +82,23 @@ public static class TokenEndpoints
         string tokenIdString,
         int amount,
         ClaimsPrincipal user,
-        Func<BigInteger, BigInteger, string, Task> action)
+        Func<BigInteger, BigInteger, string, Task> action
+    )
     {
         var email = user.FindFirst(AuthService.EmailClaim)?.Value;
-        if (string.IsNullOrEmpty(email)) return Results.Unauthorized();
+        if (string.IsNullOrEmpty(email))
+            return Results.Unauthorized();
 
         if (!BigInteger.TryParse(tokenIdString, out var tokenId))
-            return Results.Json(new BoolResponse(false, $"Invalid tokenId '{tokenIdString}'."), statusCode: 400);
+            return Results.Json(
+                new BoolResponse(false, $"Invalid tokenId '{tokenIdString}'."),
+                statusCode: 400
+            );
         if (amount <= 0)
-            return Results.Json(new BoolResponse(false, "Amount must be positive."), statusCode: 400);
+            return Results.Json(
+                new BoolResponse(false, "Amount must be positive."),
+                statusCode: 400
+            );
 
         try
         {

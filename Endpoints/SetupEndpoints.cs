@@ -23,17 +23,23 @@ public static class SetupEndpoints
         // this server has bootstrapped. The Unity Editor menu "Enjin > Stamp
         // Collection ID onto EnjinItem Assets" calls this and writes the
         // value onto every EnjinItem ScriptableObject.
-        group.MapGet("/collection-id", (EnjinService enjin) =>
-        {
-            var id = enjin.CollectionId;
-            if (id is null)
+        group.MapGet(
+            "/collection-id",
+            (EnjinService enjin) =>
             {
-                return Results.Json(
-                    new BoolResponse(false, "Collection id not initialised. " +
-                                            "Did the server finish bootstrap?"),
-                    statusCode: 503);
+                var id = enjin.CollectionId;
+                if (id is null)
+                {
+                    return Results.Json(
+                        new BoolResponse(
+                            false,
+                            "Collection id not initialised. " + "Did the server finish bootstrap?"
+                        ),
+                        statusCode: 503
+                    );
+                }
+                return Results.Ok(new CollectionIdResponse(id.Value.ToString()));
             }
-            return Results.Ok(new CollectionIdResponse(id.Value.ToString()));
-        });
+        );
     }
 }

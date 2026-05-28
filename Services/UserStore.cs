@@ -8,10 +8,11 @@ namespace PlatformSampleGameServer.Services;
 // a sample. Replace with a real persistence layer for production use.
 public sealed class UserStore
 {
-    private readonly ConcurrentDictionary<string, User> _users = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, User> _users = new(
+        StringComparer.OrdinalIgnoreCase
+    );
 
-    public User? FindByEmail(string email) =>
-        _users.TryGetValue(email, out var user) ? user : null;
+    public User? FindByEmail(string email) => _users.TryGetValue(email, out var user) ? user : null;
 
     public User Create(string email, string passwordHash)
     {

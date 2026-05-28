@@ -60,7 +60,9 @@ foreach (var v in vectors)
 
 if (failures > 0)
 {
-    Console.Error.WriteLine($"\n{failures} SS58 vector(s) failed. The encoder is producing incorrect addresses.");
+    Console.Error.WriteLine(
+        $"\n{failures} SS58 vector(s) failed. The encoder is producing incorrect addresses."
+    );
     return 1;
 }
 

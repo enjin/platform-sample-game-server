@@ -25,7 +25,10 @@ public sealed record AuthResponse(string Email, string? Wallet, string Token);
 public sealed record BoolResponse(bool Success, string? Message = null);
 
 // Mirrors PlatformModels.ManagedWalletAccount on the Unity side.
-public sealed record ManagedWalletAccountDto(AccountDto Account, IReadOnlyList<TokenAccountDto> TokenAccounts);
+public sealed record ManagedWalletAccountDto(
+    AccountDto Account,
+    IReadOnlyList<TokenAccountDto> TokenAccounts
+);
 
 // Returned by GET /api/setup/collection-id. The Unity Editor calls this once
 // during studio setup to stamp the on-chain collection id onto each
@@ -38,7 +41,11 @@ public sealed record AccountDto(string PublicKey, string Address);
 
 public sealed record TokenAccountDto(string Balance, TokenDto Token);
 
-public sealed record TokenDto(CollectionDto Collection, string TokenId, IReadOnlyList<AttributeDto> Attributes);
+public sealed record TokenDto(
+    CollectionDto Collection,
+    string TokenId,
+    IReadOnlyList<AttributeDto> Attributes
+);
 
 public sealed record CollectionDto(string CollectionId);
 

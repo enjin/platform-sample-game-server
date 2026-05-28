@@ -27,8 +27,9 @@ builder.Services.AddSingleton<AuthService>();
 builder.Services.AddSingleton<ServerState>();
 builder.Services.AddSingleton<EnjinService>();
 
-builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
-    p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
+builder.Services.AddCors(o =>
+    o.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod())
+);
 
 // JSON: camelCase property names + serialize BigInteger-as-string so the
 // Unity client's SerializableBigInteger wrapper can parse it. Records with
@@ -48,8 +49,10 @@ if (string.IsNullOrWhiteSpace(jwt.Secret))
     // Emit a generated dev secret if none is configured so the server still boots
     // for local development. Production must set Jwt:Secret explicitly.
     jwt.Secret = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
-    Console.WriteLine("[warn] Jwt:Secret not configured; generated a transient dev secret. " +
-                      "Set Jwt:Secret in appsettings or env for stable sessions across restarts.");
+    Console.WriteLine(
+        "[warn] Jwt:Secret not configured; generated a transient dev secret. "
+            + "Set Jwt:Secret in appsettings or env for stable sessions across restarts."
+    );
 
     // Propagate the generated secret into the bound JwtOptions so AuthService
     // (which resolves IOptions<JwtOptions>) signs tokens with the same key that
@@ -57,11 +60,13 @@ if (string.IsNullOrWhiteSpace(jwt.Secret))
     // would either throw on an empty Secret or sign with a different key.
     builder.Services.PostConfigure<JwtOptions>(o =>
     {
-        if (string.IsNullOrWhiteSpace(o.Secret)) o.Secret = jwt.Secret;
+        if (string.IsNullOrWhiteSpace(o.Secret))
+            o.Secret = jwt.Secret;
     });
 }
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+builder
+    .Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opts =>
     {
         opts.TokenValidationParameters = new TokenValidationParameters
@@ -79,7 +84,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 // ----- Kestrel: port + request timeout -----
-var serverOptions = builder.Configuration.GetSection("Server").Get<ServerOptions>() ?? new ServerOptions();
+var serverOptions =
+    builder.Configuration.GetSection("Server").Get<ServerOptions>() ?? new ServerOptions();
 builder.WebHost.ConfigureKestrel(k =>
 {
     k.ListenAnyIP(serverOptions.Port);
@@ -116,8 +122,13 @@ app.MapSetupEndpoints();
 // Pass --skip-bootstrap (or set Enjin:SkipBootstrap=true) to start the server
 // without creating/verifying the on-chain collection. Useful for local smoke tests
 // where you don't want to mutate canary.
-var skipBootstrap = args.Contains("--skip-bootstrap")
-    || string.Equals(builder.Configuration["Enjin:SkipBootstrap"], "true", StringComparison.OrdinalIgnoreCase);
+var skipBootstrap =
+    args.Contains("--skip-bootstrap")
+    || string.Equals(
+        builder.Configuration["Enjin:SkipBootstrap"],
+        "true",
+        StringComparison.OrdinalIgnoreCase
+    );
 
 using (var scope = app.Services.CreateScope())
 {
@@ -129,7 +140,8 @@ using (var scope = app.Services.CreateScope())
     // the legacy Node.js sample used the flat ENJIN_COLLECTION_ID name, so
     // we accept that too as a fallback for operators migrating from the old
     // server.
-    var collectionIdSeed = builder.Configuration["Enjin:CollectionId"]
+    var collectionIdSeed =
+        builder.Configuration["Enjin:CollectionId"]
         ?? Environment.GetEnvironmentVariable("ENJIN_COLLECTION_ID");
     state.OverrideFromConfig(collectionIdSeed);
 
@@ -137,12 +149,16 @@ using (var scope = app.Services.CreateScope())
 
     if (skipBootstrap)
     {
-        log.LogWarning("Bootstrap skipped (--skip-bootstrap). On-chain operations may fail until a collection ID is provided.");
+        log.LogWarning(
+            "Bootstrap skipped (--skip-bootstrap). On-chain operations may fail until a collection ID is provided."
+        );
     }
     else
     {
         var enjin = sp.GetRequiredService<EnjinService>();
-        log.LogInformation("Preparing collection and resource tokens. This may take a few minutes on first run.");
+        log.LogInformation(
+            "Preparing collection and resource tokens. This may take a few minutes on first run."
+        );
         try
         {
             await enjin.PrepareCollectionAsync(CancellationToken.None);

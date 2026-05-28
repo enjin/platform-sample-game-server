@@ -38,7 +38,9 @@ public static class SubstrateAddress
             : publicKeyHex;
         if (hex.Length != 64)
             throw new ArgumentException(
-                $"Expected 32-byte public key (64 hex chars), got {hex.Length}.", nameof(publicKeyHex));
+                $"Expected 32-byte public key (64 hex chars), got {hex.Length}.",
+                nameof(publicKeyHex)
+            );
 
         var payload = Convert.FromHexString(hex);
         return Encode(payload, ss58Prefix);
@@ -49,9 +51,13 @@ public static class SubstrateAddress
     /// </summary>
     public static string Encode(byte[] publicKey, ushort ss58Prefix)
     {
-        if (publicKey is null) throw new ArgumentNullException(nameof(publicKey));
+        if (publicKey is null)
+            throw new ArgumentNullException(nameof(publicKey));
         if (publicKey.Length != 32)
-            throw new ArgumentException($"Expected 32 bytes, got {publicKey.Length}.", nameof(publicKey));
+            throw new ArgumentException(
+                $"Expected 32 bytes, got {publicKey.Length}.",
+                nameof(publicKey)
+            );
 
         // Encode prefix. <64 fits in one byte; >=64 uses the two-byte form per
         // https://docs.substrate.io/reference/address-formats/.
@@ -70,15 +76,23 @@ public static class SubstrateAddress
         }
         else
         {
-            throw new ArgumentOutOfRangeException(nameof(ss58Prefix),
-                "SS58 prefixes >= 16384 are reserved.");
+            throw new ArgumentOutOfRangeException(
+                nameof(ss58Prefix),
+                "SS58 prefixes >= 16384 are reserved."
+            );
         }
 
         // checksum = first 2 bytes of Blake2b-512("SS58PRE" || prefix || payload)
         var hashInput = new byte[Ss58Pre.Length + prefixBytes.Length + publicKey.Length];
         Buffer.BlockCopy(Ss58Pre, 0, hashInput, 0, Ss58Pre.Length);
         Buffer.BlockCopy(prefixBytes, 0, hashInput, Ss58Pre.Length, prefixBytes.Length);
-        Buffer.BlockCopy(publicKey, 0, hashInput, Ss58Pre.Length + prefixBytes.Length, publicKey.Length);
+        Buffer.BlockCopy(
+            publicKey,
+            0,
+            hashInput,
+            Ss58Pre.Length + prefixBytes.Length,
+            publicKey.Length
+        );
 
         using var blake = new HMACBlake2B(512);
         // SS58 specifies an UNKEYED Blake2b-512 over "SS58PRE" || prefix || payload.
@@ -104,7 +118,8 @@ public static class SubstrateAddress
     {
         // Count leading zero bytes
         int zeros = 0;
-        while (zeros < data.Length && data[zeros] == 0) zeros++;
+        while (zeros < data.Length && data[zeros] == 0)
+            zeros++;
 
         // Convert big-endian bytes to base58 by repeated division.
         // Operate on a copy because we mutate during division.
@@ -122,10 +137,12 @@ public static class SubstrateAddress
                 remainder = num % 58;
             }
             encoded.Add(Base58Alphabet[remainder]);
-            if (input[startAt] == 0) startAt++;
+            if (input[startAt] == 0)
+                startAt++;
         }
 
-        for (int i = 0; i < zeros; i++) encoded.Add(Base58Alphabet[0]);
+        for (int i = 0; i < zeros; i++)
+            encoded.Add(Base58Alphabet[0]);
         encoded.Reverse();
         return new string(encoded.ToArray());
     }

@@ -13,13 +13,13 @@ public static class WalletEndpoints
         // GET /api/wallet/get-tokens - returns the player's managed wallet account
         // plus the tokens they hold in our collection. Shape matches the Unity
         // client's PlatformModels.ManagedWalletAccount.
-        group.MapGet("/get-tokens", async (
-                ClaimsPrincipal user,
-                EnjinService enjin,
-                CancellationToken ct) =>
+        group.MapGet(
+            "/get-tokens",
+            async (ClaimsPrincipal user, EnjinService enjin, CancellationToken ct) =>
             {
                 var email = user.FindFirst(AuthService.EmailClaim)?.Value;
-                if (string.IsNullOrEmpty(email)) return Results.Unauthorized();
+                if (string.IsNullOrEmpty(email))
+                    return Results.Unauthorized();
 
                 try
                 {
@@ -28,7 +28,8 @@ public static class WalletEndpoints
                     {
                         return Results.Json(
                             new BoolResponse(false, $"No managed wallet for {email}"),
-                            statusCode: 404);
+                            statusCode: 404
+                        );
                     }
                     return Results.Ok(account);
                 }
@@ -36,6 +37,7 @@ public static class WalletEndpoints
                 {
                     return Results.Json(new BoolResponse(false, ex.Message), statusCode: 500);
                 }
-            });
+            }
+        );
     }
 }

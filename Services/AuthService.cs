@@ -53,7 +53,8 @@ public sealed class AuthService
         if (string.IsNullOrWhiteSpace(_jwt.Secret))
         {
             throw new InvalidOperationException(
-                "Jwt:Secret is not configured. Set it in appsettings.Local.json or an env var.");
+                "Jwt:Secret is not configured. Set it in appsettings.Local.json or an env var."
+            );
         }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Secret));
@@ -69,7 +70,8 @@ public sealed class AuthService
                 new Claim(EmailClaim, user.Email),
             },
             expires: DateTime.UtcNow.AddHours(_jwt.ExpiryHours),
-            signingCredentials: creds);
+            signingCredentials: creds
+        );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }

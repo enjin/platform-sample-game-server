@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
-
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -34,5 +33,4 @@
     <PackageReference Include="Enjin.Platform.Sdk" Version="3.0.0" />
     <!-- <ProjectReference Include="..\platform-csharp-sdk\src\Enjin.Platform.Sdk\Enjin.Platform.Sdk\Enjin.Platform.Sdk.csproj" /> -->
   </ItemGroup>
-
 </Project>

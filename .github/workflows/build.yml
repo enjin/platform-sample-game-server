@@ -1,0 +1,56 @@
+name: Build & Verify
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - '*'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Cache NuGet Packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore Main Project
+        run: dotnet restore ./PlatformSampleGameServer.csproj
+
+      - name: Restore Tools Project
+        run: dotnet restore ./tools/Ss58SelfTest/Ss58SelfTest.csproj
+
+      - name: Restore .NET Tools
+        run: dotnet tool restore
+
+      - name: Verify Formatting (CSharpier)
+        run: dotnet csharpier check .
+
+      - name: Verify Formatting (dotnet format - main)
+        run: dotnet format ./PlatformSampleGameServer.csproj --verify-no-changes --no-restore
+
+      - name: Verify Formatting (dotnet format - tools)
+        run: dotnet format ./tools/Ss58SelfTest/Ss58SelfTest.csproj --verify-no-changes --no-restore
+
+      - name: Build Main Project
+        run: dotnet build ./PlatformSampleGameServer.csproj --configuration Release --no-restore
+
+      - name: Build Tools Project
+        run: dotnet build ./tools/Ss58SelfTest/Ss58SelfTest.csproj --configuration Release --no-restore
