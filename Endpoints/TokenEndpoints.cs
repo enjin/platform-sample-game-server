@@ -80,7 +80,7 @@ public static class TokenEndpoints
     private static async Task<IResult> Run(
         string operation,
         string tokenIdString,
-        int amount,
+        string amountString,
         ClaimsPrincipal user,
         Func<BigInteger, BigInteger, string, Task> action
     )
@@ -94,20 +94,46 @@ public static class TokenEndpoints
                 new BoolResponse(false, $"Invalid tokenId '{tokenIdString}'."),
                 statusCode: 400
             );
-        if (amount <= 0)
-            return Results.Json(
-                new BoolResponse(false, "Amount must be positive."),
-                statusCode: 400
-            );
+        if (!TryParseAmount(amountString, out var amount, out var amountError))
+            return Results.Json(new BoolResponse(false, amountError), statusCode: 400);
 
         try
         {
-            await action(tokenId, new BigInteger(amount), email);
+            await action(tokenId, amount, email);
             return Results.Ok(new BoolResponse(true));
         }
         catch (Exception ex)
         {
             return Results.Json(new BoolResponse(false, ex.Message), statusCode: 500);
         }
+    }
+
+    /// <summary>
+    /// Parses a token amount supplied as a decimal string. Token amounts are
+    /// BigIntegers on-chain, so the wire format carries them as decimal strings
+    /// to allow values above int/long range. Returns false with a user-facing
+    /// <paramref name="error"/> when the string is not a positive integer.
+    /// </summary>
+    public static bool TryParseAmount(
+        string? amountString,
+        out BigInteger amount,
+        out string? error
+    )
+    {
+        if (!BigInteger.TryParse(amountString, out amount))
+        {
+            amount = BigInteger.Zero;
+            error = $"Invalid amount '{amountString}'.";
+            return false;
+        }
+        if (amount <= 0)
+        {
+            amount = BigInteger.Zero;
+            error = "Amount must be positive.";
+            return false;
+        }
+
+        error = null;
+        return true;
     }
 }

@@ -22,15 +22,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!--
-      Enjin Platform C# SDK.
-
-      For local development against an unreleased SDK, comment the
-      PackageReference out and uncomment the ProjectReference below. The
-      ProjectReference expects the SDK repository to be checked out as a sibling
-      directory of this one.
-    -->
-    <PackageReference Include="Enjin.Platform.Sdk" Version="3.0.0" />
-    <!-- <ProjectReference Include="..\platform-csharp-sdk\src\Enjin.Platform.Sdk\Enjin.Platform.Sdk\Enjin.Platform.Sdk.csproj" /> -->
+    <PackageReference Include="Enjin.Platform.Sdk" Version="3.0.2" />
   </ItemGroup>
 </Project>

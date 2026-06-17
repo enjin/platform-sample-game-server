@@ -21,7 +21,8 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROJECT="$REPO_ROOT/PlatformSampleGameServer.csproj"
-TOOLS_PROJECT="$REPO_ROOT/tools/Ss58SelfTest/Ss58SelfTest.csproj"
+SS58_TEST_PROJECT="$REPO_ROOT/tools/Ss58SelfTest/Ss58SelfTest.csproj"
+AMOUNT_TEST_PROJECT="$REPO_ROOT/tools/TransferAmountSelfTest/TransferAmountSelfTest.csproj"
 
 cd "$REPO_ROOT"
 
@@ -34,13 +35,19 @@ dotnet csharpier format .
 echo "==> Running dotnet format (main project)"
 dotnet format "$PROJECT"
 
-echo "==> Running dotnet format (tools project)"
-dotnet format "$TOOLS_PROJECT"
+echo "==> Running dotnet format (tools projects)"
+dotnet format "$SS58_TEST_PROJECT"
+dotnet format "$AMOUNT_TEST_PROJECT"
 
 echo "==> Building main project"
 dotnet build "$PROJECT" --configuration Release
 
-echo "==> Building tools project"
-dotnet build "$TOOLS_PROJECT" --configuration Release
+echo "==> Building tools projects"
+dotnet build "$SS58_TEST_PROJECT" --configuration Release
+dotnet build "$AMOUNT_TEST_PROJECT" --configuration Release
+
+echo "==> Running self-tests"
+dotnet run --project "$SS58_TEST_PROJECT" --configuration Release
+dotnet run --project "$AMOUNT_TEST_PROJECT" --configuration Release
 
 echo "==> All checks passed"

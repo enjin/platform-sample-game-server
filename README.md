@@ -5,9 +5,11 @@ REST backend for the **Enjin Farmer** Unity sample
 demonstrating how to integrate NFTs into a game using the
 [Enjin Platform C# SDK](https://github.com/enjin/platform-csharp-sdk).
 
-This is a rewrite of the previous Node.js server in .NET 9. The wire format
-(JSON shape, route paths, JWT handling) is preserved so the existing Unity
-client works unchanged.
+This is a rewrite of the previous Node.js server in .NET 9, preserving the
+route paths and JWT handling. One deliberate wire change came with SDK v3:
+token `amount` fields on the mint / melt / transfer endpoints are sent as
+decimal strings (the SDK uses `BigInteger` for token amounts), so the matching
+Unity client sends them as strings too.
 
 ## What this server does
 

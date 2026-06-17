@@ -10,11 +10,11 @@ namespace PlatformSampleGameServer.Models;
 
 public sealed record AuthRequest(string Email, string Password);
 
-public sealed record MintRequest(string TokenId, int Amount);
+public sealed record MintRequest(string TokenId, string Amount);
 
-public sealed record MeltRequest(string TokenId, int Amount);
+public sealed record MeltRequest(string TokenId, string Amount);
 
-public sealed record TransferRequest(string TokenId, int Amount, string Recipient);
+public sealed record TransferRequest(string TokenId, string Amount, string Recipient);
 
 // ---- Response bodies ----
 
