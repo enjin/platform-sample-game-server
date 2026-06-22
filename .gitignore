@@ -1,4 +1,14 @@
-node_modules/
-.env
-npm-debug.log
 .DS_Store
+
+# .NET
+bin/
+obj/
+*.user
+
+# Local-only runtime state (persisted bootstrap collection id, etc.)
+state.json
+
+# Local-only secrets (URL, API key, JWT secret). Use appsettings.Development.json
+# or environment variables.
+appsettings.Development.json
+appsettings.Local.json
