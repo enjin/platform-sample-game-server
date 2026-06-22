@@ -6,7 +6,6 @@ namespace PlatformSampleGameServer.Services;
 // (and overrides) via IOptions<EnjinOptions>.
 public sealed class EnjinOptions
 {
-    public string ApiUrl { get; set; } = "";
     public string ApiToken { get; set; } = "";
 
     // Default to the Canary test network on Matrix relay. Override per environment.

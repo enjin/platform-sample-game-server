@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Reflection;
 using System.Text.Json;
 using Enjin.Platform.Sdk;
 using Microsoft.Extensions.Options;
@@ -28,6 +29,36 @@ namespace PlatformSampleGameServer.Services;
 //    by the player's email as externalId.
 public sealed class EnjinService : IAsyncDisposable
 {
+    // User-Agent sent to the platform, e.g. "platform-sample-game-server/1.0.0".
+    // Version comes from the assembly (set via <Version> in the .csproj). Mirrors
+    // the Enjin SDK's PlatformClient.BuildDefaultUserAgent so prerelease tags carry
+    // through (InformationalVersion preferred over the numeric AssemblyVersion).
+    private static readonly string UserAgent = "platform-sample-game-server/" + GetVersion();
+
+    private static string GetVersion()
+    {
+        var asm = typeof(EnjinService).Assembly;
+        var version =
+            asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? asm.GetName().Version?.ToString(3)
+            ?? "unknown";
+
+        // Strip SourceLink commit suffix like "1.0.0+abc1234".
+        var plus = version.IndexOf('+');
+        if (plus >= 0)
+        {
+            version = version[..plus];
+        }
+
+        // Strip a leading "v" so the header carries a plain SemVer value.
+        if (version.StartsWith('v'))
+        {
+            version = version[1..];
+        }
+
+        return version;
+    }
+
     private readonly PlatformClient _client;
     private readonly EnjinOptions _opts;
     private readonly ServerState _state;
@@ -49,8 +80,6 @@ public sealed class EnjinService : IAsyncDisposable
         _network = _opts.Network;
         _chain = _opts.Chain;
 
-        if (string.IsNullOrWhiteSpace(_opts.ApiUrl))
-            throw new InvalidOperationException("Enjin:ApiUrl is not configured.");
         if (string.IsNullOrWhiteSpace(_opts.ApiToken))
             throw new InvalidOperationException("Enjin:ApiToken is not configured.");
         if (string.IsNullOrWhiteSpace(_opts.DaemonWalletAddress))
@@ -66,10 +95,7 @@ public sealed class EnjinService : IAsyncDisposable
                 "Enjin:ResourceTokens is empty. Configure at least one resource token definition (id, name, media)."
             );
 
-        _client = new PlatformClient(
-            new Uri(_opts.ApiUrl),
-            userAgent: "platform-sample-game-server/1.0"
-        );
+        _client = new PlatformClient(userAgent: UserAgent);
         _client.Auth(_opts.ApiToken);
     }
 
