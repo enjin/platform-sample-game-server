@@ -65,7 +65,6 @@ Unity client sends them as strings too.
    | Setting | Default | Meaning |
    |---|---|---|
    | `Server.Port` | `3000` | HTTP listen port. The Unity client expects 3000 by default. |
-   | `Enjin.ApiUrl` | Canary GraphQL | Switch to production when you ship. |
    | `Enjin.Network` / `Enjin.Chain` | `Canary` / `Matrix` | |
    | `Enjin.ResourceTokens` | three entries | The Unity client has matching `EnjinItem` assets for `Id` 1, 2, 3. |
    | `Enjin.CollectionName` | `Enjin Sample Game` | Used to find or reuse an existing collection so you don't create a new one every run. |

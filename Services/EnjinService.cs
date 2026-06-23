@@ -49,8 +49,6 @@ public sealed class EnjinService : IAsyncDisposable
         _network = _opts.Network;
         _chain = _opts.Chain;
 
-        if (string.IsNullOrWhiteSpace(_opts.ApiUrl))
-            throw new InvalidOperationException("Enjin:ApiUrl is not configured.");
         if (string.IsNullOrWhiteSpace(_opts.ApiToken))
             throw new InvalidOperationException("Enjin:ApiToken is not configured.");
         if (string.IsNullOrWhiteSpace(_opts.DaemonWalletAddress))
@@ -66,10 +64,7 @@ public sealed class EnjinService : IAsyncDisposable
                 "Enjin:ResourceTokens is empty. Configure at least one resource token definition (id, name, media)."
             );
 
-        _client = new PlatformClient(
-            new Uri(_opts.ApiUrl),
-            userAgent: "platform-sample-game-server/1.0"
-        );
+        _client = new PlatformClient();
         _client.Auth(_opts.ApiToken);
     }
 
