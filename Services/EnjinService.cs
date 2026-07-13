@@ -254,8 +254,6 @@ public sealed class EnjinService : IAsyncDisposable
     {
         var query = new QueryQueryBuilder().WithGetManagedWallet(
             new ManagedWalletQueryBuilder().WithPublicKey().WithExternalId(),
-            _network,
-            _chain,
             externalId: externalId
         );
 
@@ -357,7 +355,11 @@ public sealed class EnjinService : IAsyncDisposable
 
         var input = new TransactionInput
         {
-            TransferEnj = new TransferEnjInput { Recipient = recipientAddress, Amount = amount },
+            TransferEnj = new TransferEnjInput
+            {
+                Recipient = recipientAddress,
+                Amount = amount.ToString(),
+            },
         };
 
         try
@@ -400,8 +402,6 @@ public sealed class EnjinService : IAsyncDisposable
         // Step 1: locate the managed wallet's public key.
         var mwQuery = new QueryQueryBuilder().WithGetManagedWallet(
             new ManagedWalletQueryBuilder().WithPublicKey().WithExternalId(),
-            _network,
-            _chain,
             externalId: externalId
         );
 
@@ -625,7 +625,7 @@ public sealed class EnjinService : IAsyncDisposable
             ct.ThrowIfCancellationRequested();
 
             var query = new QueryQueryBuilder().WithGetTransaction(
-                new TransactionQueryBuilder().WithUuid().WithState().WithExtrinsicHash(),
+                new TransactionQueryBuilder().WithUuid().WithState(),
                 _network,
                 _chain,
                 uuid: uuid
