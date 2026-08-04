@@ -20,7 +20,9 @@ namespace PlatformSampleGameServer.Services;
 //
 //  - There are no event subscriptions in v3. After submitting a transaction
 //    we poll GetTransaction until State is terminal
-//    (Finalized | Failed | Abandoned | Timeout).
+//    (Finalized | Failed | Abandoned | Timeout). Finalized alone does not mean
+//    success: a batch extrinsic still finalizes on-chain when wrapped items
+//    fail to dispatch, so we also require Error to be null.
 //
 //  - The daemon wallet (configured DaemonWalletAddress) owns the collection
 //    and mints tokens to player wallets. Per-player melts and transfers are
@@ -625,7 +627,11 @@ public sealed class EnjinService : IAsyncDisposable
             ct.ThrowIfCancellationRequested();
 
             var query = new QueryQueryBuilder().WithGetTransaction(
-                new TransactionQueryBuilder().WithUuid().WithState(),
+                new TransactionQueryBuilder()
+                    .WithUuid()
+                    .WithState()
+                    .WithError()
+                    .WithFailedItemIndexes(),
                 _network,
                 _chain,
                 uuid: uuid
@@ -642,6 +648,17 @@ public sealed class EnjinService : IAsyncDisposable
             switch (txn.State)
             {
                 case TransactionStateEnum.Finalized:
+                    // A non-null Error under Finalized means the extrinsic made it
+                    // on-chain but one or more wrapped batch items did not dispatch,
+                    // so the requested work did not fully happen.
+                    if (!string.IsNullOrEmpty(txn.Error))
+                    {
+                        throw new InvalidOperationException(
+                            $"Transaction {uuid} ({description}) finalized but reported an error: "
+                                + $"{txn.Error}{DescribeFailedItems(txn.FailedItemIndexes)}"
+                        );
+                    }
+
                     _log.LogInformation(
                         "Transaction {Uuid} ({Desc}) finalized after {Elapsed:F0}s.",
                         uuid,
@@ -655,6 +672,12 @@ public sealed class EnjinService : IAsyncDisposable
                 case TransactionStateEnum.Timeout:
                     throw new InvalidOperationException(
                         $"Transaction {uuid} ({description}) ended in terminal state {txn.State}."
+                            + (
+                                string.IsNullOrEmpty(txn.Error)
+                                    ? string.Empty
+                                    : $" Error: {txn.Error}"
+                            )
+                            + DescribeFailedItems(txn.FailedItemIndexes)
                     );
 
                 default:
@@ -699,6 +722,13 @@ public sealed class EnjinService : IAsyncDisposable
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    // Zero-based positions of the batch items that failed to dispatch, when the
+    // platform reports them (CONTINUE_ON_ERROR batches only).
+    private static string DescribeFailedItems(ICollection<int>? failedItemIndexes) =>
+        failedItemIndexes is { Count: > 0 }
+            ? $" Failed batch items: {string.Join(", ", failedItemIndexes)}."
+            : string.Empty;
 
     private BigInteger RequireCollectionId() =>
         _state.CollectionId
